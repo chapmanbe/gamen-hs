@@ -43,6 +43,7 @@ data Formula
   | Stit String Formula       -- ^ [i]A (agent i sees to it that A)
   | GroupStit Formula          -- ^ [Agt]A (grand coalition stit)
   | Settled Formula            -- ^ □_s A (historical necessity / settledness)
+  | Next Formula               -- ^ XA (next state, LACA)
   deriving (Eq, Ord)
 
 -- | ⊤ abbreviates ¬⊥ (Definition 1.3, item 1).
@@ -84,6 +85,7 @@ instance Show Formula where
     . showString "]" . showsPrec 10 f
   showsPrec _ (GroupStit f)  = showString "[Agt]" . showsPrec 10 f
   showsPrec _ (Settled f)    = showString "Settled " . showsPrec 10 f
+  showsPrec _ (Next f)       = showString "X" . showsPrec 10 f
 
 -- | True if the formula contains no □ or ◇ operators.
 --
@@ -111,6 +113,7 @@ isModalFree (Announce _ _)    = False
 isModalFree (Stit _ _)        = False
 isModalFree (GroupStit _)     = False
 isModalFree (Settled _)       = False
+isModalFree (Next _)          = False
 
 -- | Collect all atomic proposition names in a formula.
 --
@@ -137,6 +140,7 @@ atoms (Announce b c)    = atoms b `Set.union` atoms c
 atoms (Stit _ f)        = atoms f
 atoms (GroupStit f)     = atoms f
 atoms (Settled f)       = atoms f
+atoms (Next f)          = atoms f
 
 -- | Deliberative stit: agent i deliberately sees to it that A.
 -- [i dstit]A = [i]A /\ ~Settled(A) (Lorini 2013).

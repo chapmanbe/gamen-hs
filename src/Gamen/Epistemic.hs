@@ -114,6 +114,7 @@ eSatisfies _ _ (Until _ _)       = error "Until not supported in epistemic model
 eSatisfies _ _ (Stit _ _)        = error "Stit not supported in epistemic models; use Gamen.Stit"
 eSatisfies _ _ (GroupStit _)     = error "GroupStit not supported in epistemic models; use Gamen.Stit"
 eSatisfies _ _ (Settled _)       = error "Settled not supported in epistemic models; use Gamen.Stit"
+eSatisfies _ _ (Next _)          = error "Next not supported in epistemic models; use Gamen.Laca"
 
 -- K_a B: true at w iff B holds at all R_a-successors of w
 eSatisfies m w (Knowledge agent f) =

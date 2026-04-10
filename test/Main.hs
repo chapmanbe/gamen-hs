@@ -3,10 +3,12 @@ module Main (main) where
 import Test.Hspec
 import Data.Set qualified as Set
 
+import Data.Map.Strict qualified as Map
 import Gamen.Epistemic
 import Gamen.Formula
 import Gamen.FrameProperties
 import Gamen.Kripke
+import Gamen.Laca
 import Gamen.Semantics
 import Gamen.Stit
 import Gamen.Tableau
@@ -1027,3 +1029,88 @@ main = hspec $ do
       sIsTrueIn stitModel (Or tp tq) `shouldBe` True
       -- p is not true at all worlds
       sIsTrueIn stitModel tp `shouldBe` False
+
+  -- ================================================================
+  -- LACA: Logic of Agency based on Control and Attempt
+  -- (Herzig, Lorini & Perrotin, IJCAI 2022)
+  -- ================================================================
+
+  -- Example 1 from the paper (simplified):
+  -- Two agents controlling a heating (h) and window (w).
+  -- Agent 1 controls h, agent 2 controls w.
+  let lacaModel = mkLacaModel [("h", "1"), ("w", "2")]
+      -- Initial state: h=false, w=false (heating off, window closed)
+      s0 = Map.fromList [("h", False), ("w", False)] :: LacaState
+      -- Agent 1 attempts to turn on heating
+      atts1 = Set.fromList ["h"]  -- agent 1 flips h
+      -- No attempts
+      atts0 = Set.empty
+
+  describe "LACA formula construction" $ do
+
+    it "displays Next" $ do
+      show (Next tp) `shouldBe` "Xp"
+
+    it "Next is not modal-free" $ do
+      isModalFree (Next tp) `shouldBe` False
+
+  describe "LACA state operations" $ do
+
+    it "computes successor state" $ do
+      -- Flipping h: h becomes True
+      let s1 = succState s0 atts1
+      stateValue s1 "h" `shouldBe` True
+      stateValue s1 "w" `shouldBe` False
+
+    it "generates trajectories" $ do
+      -- With attempt {h}, trajectory: h=F -> h=T -> h=F (cycle detected)
+      let traj = trajectory s0 atts1 10
+      length traj `shouldBe` 3  -- stops at cycle: s0, s1, s0
+      stateValue (traj !! 0) "h" `shouldBe` False  -- initial
+      stateValue (traj !! 1) "h" `shouldBe` True   -- after 1 step
+
+  describe "LACA satisfaction" $ do
+
+    it "evaluates atoms at current state" $ do
+      lSatisfies lacaModel s0 atts0 (Atom "h") `shouldBe` False
+      lSatisfies lacaModel s0 atts0 (Atom "w") `shouldBe` False
+
+    it "evaluates Next (X operator)" $ do
+      -- Xh with attempt {h}: h will be true at next state
+      lSatisfies lacaModel s0 atts1 (Next (Atom "h")) `shouldBe` True
+      -- Xw with attempt {h}: w unchanged (still false)
+      lSatisfies lacaModel s0 atts1 (Next (Atom "w")) `shouldBe` False
+
+    it "evaluates G (always future)" $ do
+      -- With no attempts, state never changes -> G(~h) is true
+      lSatisfies lacaModel s0 atts0 (FutureBox (Not (Atom "h"))) `shouldBe` True
+      -- With attempt {h}, h oscillates -> G(h) is false
+      lSatisfies lacaModel s0 atts1 (FutureBox (Atom "h")) `shouldBe` False
+
+    it "evaluates F (eventually)" $ do
+      -- With attempt {h}, h will be true eventually
+      lSatisfies lacaModel s0 atts1 (FutureDiamond (Atom "h")) `shouldBe` True
+      -- With no attempts, h never becomes true
+      lSatisfies lacaModel s0 atts0 (FutureDiamond (Atom "h")) `shouldBe` False
+
+    it "evaluates [i cstit] (Chellas stit)" $ do
+      -- [1]Xh at s0 with atts={h}: agent 1 controls h and is attempting
+      -- to flip it. For ALL possible attempts by agent 2 (on w),
+      -- h will be true at next state. -> true
+      lSatisfies lacaModel s0 atts1 (Stit "1" (Next (Atom "h")))
+        `shouldBe` True
+      -- [2]Xh at s0: agent 2 controls w, not h. Agent 1 might or might
+      -- not attempt h. So not all non-2 attempts guarantee Xh. -> false
+      lSatisfies lacaModel s0 atts0 (Stit "2" (Next (Atom "h")))
+        `shouldBe` False
+
+    it "evaluates Settled (historical necessity)" $ do
+      -- Settled(Xh): h is true at next state regardless of ANY attempt
+      -- combination. If nobody flips h, h stays false. -> false
+      lSatisfies lacaModel s0 atts0 (Settled (Next (Atom "h")))
+        `shouldBe` False
+
+    it "evaluates deliberative stit" $ do
+      -- dstit "1" (Xh): [1]Xh (true with atts1) and ~Settled(Xh) (true)
+      lSatisfies lacaModel s0 atts1 (dstit "1" (Next (Atom "h")))
+        `shouldBe` True

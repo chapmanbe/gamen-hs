@@ -194,6 +194,7 @@ sSatisfies _ _ (Since _ _)     = error "Since not yet supported in STIT models"
 sSatisfies _ _ (Until _ _)     = error "Until not yet supported in STIT models"
 sSatisfies _ _ (Knowledge _ _) = error "Knowledge not supported in STIT models; use Gamen.Epistemic"
 sSatisfies _ _ (Announce _ _)  = error "Announce not supported in STIT models; use Gamen.Epistemic"
+sSatisfies _ _ (Next _)        = error "Next not supported in STIT models; use Gamen.Laca"
 
 -- | A formula is true in a STIT model if it holds at every world.
 sIsTrueIn :: StitModel -> Formula -> Bool

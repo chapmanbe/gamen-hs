@@ -17,6 +17,7 @@ library
     Gamen.Formula
     Gamen.FrameProperties
     Gamen.Kripke
+    Gamen.Laca
     Gamen.Semantics
     Gamen.Stit
     Gamen.Tableau
