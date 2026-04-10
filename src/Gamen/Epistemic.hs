@@ -111,6 +111,9 @@ eSatisfies _ _ (PastBox _)       = error "PastBox not supported in epistemic mod
 eSatisfies _ _ (PastDiamond _)   = error "PastDiamond not supported in epistemic models"
 eSatisfies _ _ (Since _ _)       = error "Since not supported in epistemic models"
 eSatisfies _ _ (Until _ _)       = error "Until not supported in epistemic models"
+eSatisfies _ _ (Stit _ _)        = error "Stit not supported in epistemic models; use Gamen.Stit"
+eSatisfies _ _ (GroupStit _)     = error "GroupStit not supported in epistemic models; use Gamen.Stit"
+eSatisfies _ _ (Settled _)       = error "Settled not supported in epistemic models; use Gamen.Stit"
 
 -- K_a B: true at w iff B holds at all R_a-successors of w
 eSatisfies m w (Knowledge agent f) =

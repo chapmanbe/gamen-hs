@@ -8,6 +8,9 @@ module Gamen.Formula
   , top
   , isModalFree
   , atoms
+    -- * Derived STIT operators
+  , dstit
+  , commitment
   ) where
 
 import Data.Set (Set)
@@ -37,6 +40,9 @@ data Formula
   | Until Formula Formula     -- ^ U B C (B until C)
   | Knowledge String Formula  -- ^ K_a A (agent a knows A)
   | Announce Formula Formula  -- ^ [B]C (public announcement)
+  | Stit String Formula       -- ^ [i]A (agent i sees to it that A)
+  | GroupStit Formula          -- ^ [Agt]A (grand coalition stit)
+  | Settled Formula            -- ^ □_s A (historical necessity / settledness)
   deriving (Eq, Ord)
 
 -- | ⊤ abbreviates ¬⊥ (Definition 1.3, item 1).
@@ -74,6 +80,10 @@ instance Show Formula where
     . showString "]" . showsPrec 10 f
   showsPrec _ (Announce b c) = showString "[" . shows b
     . showString "]" . showsPrec 10 c
+  showsPrec _ (Stit a f)    = showString "[" . showString a
+    . showString "]" . showsPrec 10 f
+  showsPrec _ (GroupStit f)  = showString "[Agt]" . showsPrec 10 f
+  showsPrec _ (Settled f)    = showString "Settled " . showsPrec 10 f
 
 -- | True if the formula contains no □ or ◇ operators.
 --
@@ -98,6 +108,9 @@ isModalFree (Since _ _)       = False
 isModalFree (Until _ _)       = False
 isModalFree (Knowledge _ _)   = False
 isModalFree (Announce _ _)    = False
+isModalFree (Stit _ _)        = False
+isModalFree (GroupStit _)     = False
+isModalFree (Settled _)       = False
 
 -- | Collect all atomic proposition names in a formula.
 --
@@ -121,3 +134,22 @@ atoms (Since l r)       = atoms l `Set.union` atoms r
 atoms (Until l r)       = atoms l `Set.union` atoms r
 atoms (Knowledge _ f)   = atoms f
 atoms (Announce b c)    = atoms b `Set.union` atoms c
+atoms (Stit _ f)        = atoms f
+atoms (GroupStit f)     = atoms f
+atoms (Settled f)       = atoms f
+
+-- | Deliberative stit: agent i deliberately sees to it that A.
+-- [i dstit]A = [i]A /\ ~Settled(A) (Lorini 2013).
+dstit :: String -> Formula -> Formula
+dstit agent phi = And (Stit agent phi) (Not (Settled phi))
+
+-- | Social commitment: agent i is committed to agent j to ensure A.
+-- C_{i:j}A = Settled(~F*[i]A -> G*v_{i,j}) /\ ~[i]A
+-- where F*p = p \/ Fp, G*p = p /\ Gp (Lorini 2013, Section 3).
+commitment :: String -> String -> Formula -> Formula
+commitment i j phi =
+  let fStar p = Or p (FutureDiamond p)
+      gStar p = And p (FutureBox p)
+      viol = Atom ("v_" ++ i ++ "_" ++ j)
+  in And (Settled (Implies (Not (fStar (Stit i phi))) (gStar viol)))
+         (Not (Stit i phi))

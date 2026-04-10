@@ -18,6 +18,7 @@ library
     Gamen.FrameProperties
     Gamen.Kripke
     Gamen.Semantics
+    Gamen.Stit
     Gamen.Tableau
     Gamen.Temporal
   hs-source-dirs:   src

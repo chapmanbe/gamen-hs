@@ -8,6 +8,7 @@ import Gamen.Formula
 import Gamen.FrameProperties
 import Gamen.Kripke
 import Gamen.Semantics
+import Gamen.Stit
 import Gamen.Tableau
 import Gamen.Temporal
 
@@ -889,3 +890,140 @@ main = hspec $ do
     it "wraps KripkeModel as single-agent epistemic model" $ do
       Set.member "w2" (eAccessible (eFrame em) "a" "w1") `shouldBe` True
       eSatisfies em "w1" (Knowledge "a" tp) `shouldBe` True
+
+  -- ================================================================
+  -- T-STIT Logic (Lorini 2013)
+  -- ================================================================
+
+  describe "STIT formula construction" $ do
+
+    it "displays Stit, GroupStit, Settled" $ do
+      show (Stit "i" tp) `shouldBe` "[i]p"
+      show (GroupStit tp) `shouldBe` "[Agt]p"
+      show (Settled tp) `shouldBe` "Settled p"
+
+    it "STIT formulas are not modal-free" $ do
+      isModalFree (Stit "i" tp) `shouldBe` False
+      isModalFree (GroupStit tp) `shouldBe` False
+      isModalFree (Settled tp) `shouldBe` False
+
+    it "collects atoms from STIT formulas" $ do
+      atoms (Stit "i" (Implies tp tq)) `shouldBe` Set.fromList ["p", "q"]
+      atoms (GroupStit tp) `shouldBe` Set.singleton "p"
+
+    it "dstit smart constructor" $ do
+      dstit "i" tp `shouldBe` And (Stit "i" tp) (Not (Settled tp))
+
+  -- A simple 2-moment T-STIT model:
+  -- Moment m0: {w1, w2} (present), Moment m1: {w3, w4} (future)
+  -- Agent "a": choice at m0 partitions into {w1} and {w2}
+  -- Agent "b": choice at m0 partitions into {w1, w2} (trivial)
+  -- R_□: {w1,w2} and {w3,w4}
+  -- R_G: w1->w3, w2->w4 (strict future)
+  -- T-STIT model satisfying all C1-C7.
+  --
+  -- Single moment m0 with 2 worlds: {w1, w2}. No future (R_G empty).
+  -- This is the simplest valid T-STIT frame (atemporal).
+  -- Agent "a": choice cells {w1} and {w2} (a distinguishes them)
+  -- Agent "b": trivial choice {w1, w2}
+  -- R_□: {w1, w2} (one moment)
+  -- R_Agt: intersection of R_a and R_b = R_a = {{w1}, {w2}}
+  let stitFrame = mkStitFrame
+        ["w1", "w2"]
+        -- R_□ (settled): one moment
+        [("w1","w1"), ("w1","w2"), ("w2","w1"), ("w2","w2")]
+        -- Per-agent relations
+        [ ("a", [("w1","w1"), ("w2","w2")])      -- a distinguishes w1 from w2
+        , ("b", [("w1","w1"), ("w1","w2"), ("w2","w1"), ("w2","w2")])  -- b trivial
+        ]
+        -- R_G: no future (atemporal single moment)
+        []
+      stitModel = mkStitModel stitFrame
+        [("p", ["w1"]), ("q", ["w2"])]
+
+  describe "STIT model construction" $ do
+
+    it "builds frame with correct worlds" $ do
+      Set.size (sWorlds stitFrame) `shouldBe` 2
+
+    it "auto-computes R_Agt as intersection of R_i" $ do
+      -- At w1: R_a(w1)={w1}, R_b(w1)={w1,w2}, so R_Agt(w1)={w1}
+      sAccessible (rGrandCoal stitFrame) "w1" `shouldBe` Set.singleton "w1"
+      sAccessible (rGrandCoal stitFrame) "w2" `shouldBe` Set.singleton "w2"
+
+    it "moment returns R_□ equivalence class" $ do
+      moment stitFrame "w1" `shouldBe` Set.fromList ["w1", "w2"]
+
+    it "choiceCell returns R_i equivalence class" $ do
+      choiceCell stitFrame "a" "w1" `shouldBe` Set.singleton "w1"
+      choiceCell stitFrame "a" "w2" `shouldBe` Set.singleton "w2"
+      choiceCell stitFrame "b" "w1" `shouldBe` Set.fromList ["w1", "w2"]
+
+  describe "STIT satisfaction" $ do
+
+    it "evaluates [i]phi (agent stit)" $ do
+      -- [a]p at w1: R_a(w1) = {w1}, p true at w1 -> true
+      sSatisfies stitModel "w1" (Stit "a" tp) `shouldBe` True
+      -- [a]p at w2: R_a(w2) = {w2}, p false at w2 -> false
+      sSatisfies stitModel "w2" (Stit "a" tp) `shouldBe` False
+      -- [b]p at w1: R_b(w1) = {w1,w2}, p false at w2 -> false
+      sSatisfies stitModel "w1" (Stit "b" tp) `shouldBe` False
+
+    it "evaluates [Agt]phi (grand coalition stit)" $ do
+      -- [Agt]p at w1: R_Agt(w1) = {w1}, p at w1 -> true
+      sSatisfies stitModel "w1" (GroupStit tp) `shouldBe` True
+      -- [Agt]p at w2: R_Agt(w2) = {w2}, p not at w2 -> false
+      sSatisfies stitModel "w2" (GroupStit tp) `shouldBe` False
+
+    it "evaluates Settled phi (historical necessity)" $ do
+      -- Settled p at w1: R_□(w1) = {w1,w2}, p at w1 but not w2 -> false
+      sSatisfies stitModel "w1" (Settled tp) `shouldBe` False
+      -- Settled (p ∨ q) at w1: p∨q true at w1 (p) and w2 (q) -> true
+      sSatisfies stitModel "w1" (Settled (Or tp tq)) `shouldBe` True
+
+    it "evaluates deliberative stit" $ do
+      -- dstit "a" p at w1: [a]p (true) and ~Settled(p) (true, since p not at w2)
+      sSatisfies stitModel "w1" (dstit "a" tp) `shouldBe` True
+      -- dstit "a" (p∨q) at w1: [a](p∨q) true, Settled(p∨q) also true -> false
+      sSatisfies stitModel "w1" (dstit "a" (Or tp tq)) `shouldBe` False
+
+    it "evaluates temporal operators (vacuous with no future)" $ do
+      -- Gp at w1: R_G(w1) = {}, vacuously true
+      sSatisfies stitModel "w1" (FutureBox tp) `shouldBe` True
+      -- Fp at w1: R_G(w1) = {}, no witness -> false
+      sSatisfies stitModel "w1" (FutureDiamond tp) `shouldBe` False
+
+  describe "STIT frame constraint checking" $ do
+
+    it "valid frame passes all constraints" $ do
+      isValidStitFrame stitFrame `shouldBe` True
+
+    it "C1: R_i must be subset of R_□" $ do
+      checkC1 stitFrame `shouldBe` True
+      -- A frame where agent sees across moments fails C1
+      let badFrame = mkStitFrame ["w1","w2"]
+            [("w1","w1"), ("w2","w2")]  -- R_□: each world its own moment
+            [("a", [("w1","w1"), ("w1","w2"), ("w2","w1"), ("w2","w2")])]  -- a sees across
+            []
+      checkC1 badFrame `shouldBe` False
+
+    it "C2: independence of agents" $ do
+      checkC2 stitFrame `shouldBe` True
+
+    it "C3: R_Agt is intersection of R_i" $ do
+      checkC3 stitFrame `shouldBe` True
+
+    it "C7: R_G irreflexive within R_□ classes" $ do
+      checkC7 stitFrame `shouldBe` True
+      -- A frame with future within the same moment would fail
+      let badFrame = mkStitFrame ["w1","w2"]
+            [("w1","w1"), ("w1","w2"), ("w2","w1"), ("w2","w2")]  -- same moment
+            []
+            [("w1","w2")]  -- w1 -> w2 but both in same moment
+      checkC7 badFrame `shouldBe` False
+
+    it "sIsTrueIn checks all worlds" $ do
+      -- p ∨ q is true at all worlds in our model
+      sIsTrueIn stitModel (Or tp tq) `shouldBe` True
+      -- p is not true at all worlds
+      sIsTrueIn stitModel tp `shouldBe` False
