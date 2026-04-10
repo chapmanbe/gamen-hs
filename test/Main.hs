@@ -4,6 +4,7 @@ import Test.Hspec
 import Data.Set qualified as Set
 
 import Data.Map.Strict qualified as Map
+import Gamen.DeonticStit
 import Gamen.Epistemic
 import Gamen.Formula
 import Gamen.FrameProperties
@@ -1114,3 +1115,127 @@ main = hspec $ do
       -- dstit "1" (Xh): [1]Xh (true with atts1) and ~Settled(Xh) (true)
       lSatisfies lacaModel s0 atts1 (dstit "1" (Next (Atom "h")))
         `shouldBe` True
+
+  -- ================================================================
+  -- Deontic STIT (Lyon & van Berkel, JAIR 2024)
+  -- ================================================================
+
+  -- The cycling example from the paper (Figure 1):
+  -- Jade (j) and Kai (k) cycling on a two-lane road.
+  -- W = {w1, w2, w3, w4}
+  -- Jade's choices: {w1,w3} and {w2,w4}
+  -- Kai's choices: {w1,w2} and {w3,w4}
+  -- Jade's obligatory choice: {w1,w3} (cycle left)
+  -- Kai's obligatory choice: {w1,w2} (cycle left)
+  -- left_jade: w1,w3; right_jade: w2,w4
+  -- left_kai: w1,w2; right_kai: w3,w4
+  -- coll (collision): w2,w3
+
+  let dsFrame' = mkDSFrame ["w1","w2","w3","w4"]
+        -- Jade's choice relation (equivalence classes: {w1,w3}, {w2,w4})
+        [ ("j", [ ("w1","w1"), ("w1","w3"), ("w3","w1"), ("w3","w3")
+                , ("w2","w2"), ("w2","w4"), ("w4","w2"), ("w4","w4") ])
+        -- Kai's choice relation (equivalence classes: {w1,w2}, {w3,w4})
+        , ("k", [ ("w1","w1"), ("w1","w2"), ("w2","w1"), ("w2","w2")
+                , ("w3","w3"), ("w3","w4"), ("w4","w3"), ("w4","w4") ])
+        ]
+        -- Ideal sets: Jade obligated to {w1,w3}, Kai to {w1,w2}
+        [("j", ["w1","w3"]), ("k", ["w1","w2"])]
+      dsModel' = mkDSModel dsFrame'
+        [ ("left_jade",  ["w1","w3"])
+        , ("right_jade", ["w2","w4"])
+        , ("left_kai",   ["w1","w2"])
+        , ("right_kai",  ["w3","w4"])
+        , ("coll",       ["w2","w3"])
+        ]
+      lj = Atom "left_jade"
+      rj = Atom "right_jade"
+      lk = Atom "left_kai"
+      rk = Atom "right_kai"
+      coll = Atom "coll"
+
+  describe "Deontic STIT formula construction" $ do
+
+    it "displays Ought and Permitted" $ do
+      show (Ought "j" lj) `shouldBe` "O[j]left_jade"
+      show (Permitted "j" lj) `shouldBe` "P[j]left_jade"
+
+    it "Ought/Permitted are not modal-free" $ do
+      isModalFree (Ought "j" lj) `shouldBe` False
+      isModalFree (Permitted "j" lj) `shouldBe` False
+
+  describe "DS model construction and frame conditions" $ do
+
+    it "valid frame passes all conditions" $ do
+      isValidDSFrame dsFrame' `shouldBe` True
+
+    it "C1: R_[i] are equivalence relations" $ do
+      checkDS_C1 dsFrame' `shouldBe` True
+
+    it "C2: independence of agents" $ do
+      checkDS_C2 dsFrame' `shouldBe` True
+
+    it "D1: ideal worlds subset of W" $ do
+      checkDS_D1 dsFrame' `shouldBe` True
+
+    it "D2: every agent has ideal worlds" $ do
+      checkDS_D2 dsFrame' `shouldBe` True
+
+    it "D3: ideal worlds fill choice cells" $ do
+      checkDS_D3 dsFrame' `shouldBe` True
+
+  describe "DS satisfaction (Definition 3)" $ do
+
+    it "evaluates [i]phi (agent choice)" $ do
+      -- [j]left_jade at w1: R_j(w1)={w1,w3}, left_jade at both -> true
+      dsSatisfies dsModel' "w1" (Stit "j" lj) `shouldBe` True
+      -- [j]left_jade at w2: R_j(w2)={w2,w4}, left_jade at neither -> false
+      dsSatisfies dsModel' "w2" (Stit "j" lj) `shouldBe` False
+
+    it "evaluates □phi (settled)" $ do
+      -- □left_jade: left_jade at all worlds? w2 is right_jade -> false
+      dsSatisfies dsModel' "w1" (Box lj) `shouldBe` False
+      -- □(left_jade ∨ right_jade): every world is either -> true
+      dsSatisfies dsModel' "w1" (Box (Or lj rj)) `shouldBe` True
+
+    it "evaluates ⊗_i phi (ought)" $ do
+      -- ⊗_j left_jade: ideal_j = {w1,w3}, left_jade at both -> true
+      dsSatisfies dsModel' "w1" (Ought "j" lj) `shouldBe` True
+      -- ⊗_j right_jade: ideal_j = {w1,w3}, right_jade at neither -> false
+      dsSatisfies dsModel' "w1" (Ought "j" rj) `shouldBe` False
+      -- ⊗_k left_kai: ideal_k = {w1,w2}, left_kai at both -> true
+      dsSatisfies dsModel' "w1" (Ought "k" lk) `shouldBe` True
+
+    it "evaluates ⊖_i phi (permitted)" $ do
+      -- ⊖_j left_jade: some ideal world has left_jade -> true
+      dsSatisfies dsModel' "w1" (Permitted "j" lj) `shouldBe` True
+      -- ⊖_j coll: ideal_j = {w1,w3}, coll at w3 -> true
+      dsSatisfies dsModel' "w1" (Permitted "j" coll) `shouldBe` True
+      -- ⊖_j right_jade: ideal_j = {w1,w3}, right_jade at neither -> false
+      dsSatisfies dsModel' "w1" (Permitted "j" rj) `shouldBe` False
+
+    it "collision avoidance is settled if both comply" $ do
+      -- □(¬coll → (right_jade∧right_kai) ∨ (left_jade∧left_kai))
+      -- i.e., no-collision states are where both cycle the same way
+      let noColl = Implies (Not coll) (Or (And rj rk) (And lj lk))
+      dsSatisfies dsModel' "w1" (Box noColl) `shouldBe` True
+
+  describe "Normative reasoning applications (Section 5)" $ do
+
+    it "duty checking: identifies Jade's obligations" $ do
+      let duties = dutyCheck dsModel' "w1" "j" [lj, rj, lk, rk]
+      duties `shouldBe` [lj]  -- only left_jade is obligatory for j
+
+    it "compliance checking: Jade's left choice complies" $ do
+      -- Jade's left choice = {w1, w3}
+      complianceCheck dsModel' "j" (Set.fromList ["w1","w3"]) `shouldBe` True
+      -- Jade's right choice = {w2, w4} does not comply
+      complianceCheck dsModel' "j" (Set.fromList ["w2","w4"]) `shouldBe` False
+
+    it "joint fulfillment: can Jade fulfill all duties?" $ do
+      jointFulfillment dsModel' "j" [lj] `shouldBe` True
+      -- Can Jade fulfill left_jade AND ¬coll simultaneously?
+      -- Ideal worlds: {w1,w3}. At w1: left_jade ✓, ¬coll ✓. -> true
+      jointFulfillment dsModel' "j" [lj, Not coll] `shouldBe` True
+      -- Can Jade jointly fulfill right_jade? ideal_j={w1,w3}, right_jade at neither -> false
+      jointFulfillment dsModel' "j" [rj] `shouldBe` False

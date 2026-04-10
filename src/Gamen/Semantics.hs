@@ -115,6 +115,10 @@ satisfies _ _ (Settled _) =
   error "Settled operator requires a StitModel (use Gamen.Stit)"
 satisfies _ _ (Next _) =
   error "Next operator requires a LacaModel (use Gamen.Laca)"
+satisfies _ _ (Ought _ _) =
+  error "Ought operator requires a DSModel (use Gamen.DeonticStit)"
+satisfies _ _ (Permitted _ _) =
+  error "Permitted operator requires a DSModel (use Gamen.DeonticStit)"
 
 -- | A formula is true in a model if it holds at every world
 -- (Definition 1.9, B&D).

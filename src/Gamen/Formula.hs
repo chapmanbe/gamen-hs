@@ -44,6 +44,8 @@ data Formula
   | GroupStit Formula          -- ^ [Agt]A (grand coalition stit)
   | Settled Formula            -- ^ □_s A (historical necessity / settledness)
   | Next Formula               -- ^ XA (next state, LACA)
+  | Ought String Formula       -- ^ ⊗_i A (agent i ought to see to it that A)
+  | Permitted String Formula   -- ^ ⊖_i A (agent i is permitted to see to it that A)
   deriving (Eq, Ord)
 
 -- | ⊤ abbreviates ¬⊥ (Definition 1.3, item 1).
@@ -86,6 +88,10 @@ instance Show Formula where
   showsPrec _ (GroupStit f)  = showString "[Agt]" . showsPrec 10 f
   showsPrec _ (Settled f)    = showString "Settled " . showsPrec 10 f
   showsPrec _ (Next f)       = showString "X" . showsPrec 10 f
+  showsPrec _ (Ought a f)    = showString "O[" . showString a
+    . showString "]" . showsPrec 10 f
+  showsPrec _ (Permitted a f) = showString "P[" . showString a
+    . showString "]" . showsPrec 10 f
 
 -- | True if the formula contains no □ or ◇ operators.
 --
@@ -114,6 +120,8 @@ isModalFree (Stit _ _)        = False
 isModalFree (GroupStit _)     = False
 isModalFree (Settled _)       = False
 isModalFree (Next _)          = False
+isModalFree (Ought _ _)       = False
+isModalFree (Permitted _ _)   = False
 
 -- | Collect all atomic proposition names in a formula.
 --
@@ -141,6 +149,8 @@ atoms (Stit _ f)        = atoms f
 atoms (GroupStit f)     = atoms f
 atoms (Settled f)       = atoms f
 atoms (Next f)          = atoms f
+atoms (Ought _ f)       = atoms f
+atoms (Permitted _ f)   = atoms f
 
 -- | Deliberative stit: agent i deliberately sees to it that A.
 -- [i dstit]A = [i]A /\ ~Settled(A) (Lorini 2013).

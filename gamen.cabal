@@ -13,6 +13,7 @@ build-type:      Simple
 
 library
   exposed-modules:
+    Gamen.DeonticStit
     Gamen.Epistemic
     Gamen.Formula
     Gamen.FrameProperties
