@@ -1,0 +1,43 @@
+cabal-version:   3.0
+name:            gamen
+version:         0.1.0.0
+synopsis:        Modal logic and game-theoretic reasoning
+description:
+  Haskell implementation of modal logic with Kripke semantics,
+  tableau proving, and deontic-temporal reasoning.
+  Ported from Gamen.jl. Named from Old English /gamen/ (game, sport, joy).
+
+license:         MIT
+author:          Brian Chapman, Jeremiah Chapman
+build-type:      Simple
+
+library
+  exposed-modules:
+    Gamen.Formula
+    Gamen.Kripke
+    Gamen.Semantics
+  hs-source-dirs:   src
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    containers >= 0.6
+
+test-suite gamen-test
+  type:             exitcode-stdio-1.0
+  main-is:          Main.hs
+  hs-source-dirs:   test
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    containers >= 0.6,
+    gamen,
+    hspec >= 2.10
+
+executable gamen-repl
+  main-is:          Main.hs
+  hs-source-dirs:   app
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    containers >= 0.6,
+    gamen
