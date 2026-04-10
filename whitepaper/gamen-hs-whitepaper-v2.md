@@ -338,9 +338,90 @@ We propose a structured evaluation framework with three dimensions.
 
 ---
 
-## 10. Conclusion
+## 10. Epistemic Simulation: Reasoning Without Reading Minds
+
+### 10.1 The Problem of Unobservable Knowledge
+
+A physician's epistemic state---what they actually know at the moment of a clinical decision---is not directly observable. We cannot open a clinician's mind and inventory their beliefs. This seems to undermine the usefulness of epistemic logic for clinical applications: if we cannot determine the input (the physician's knowledge), how can we evaluate the output (what they ought to do given that knowledge)?
+
+The answer is that we do not need to determine any individual physician's knowledge. Instead, we **simulate across the space of possible knowledge states** and ask what happens in each one. This transforms an intractable measurement problem (determining one person's mental state) into a tractable computational problem (enumerating a finite set of scenarios and analyzing each one).
+
+### 10.2 The Approach: Enumerate, Don't Measure
+
+A clinical scenario involves a set of epistemically relevant facts: lab results, patient history, allergy status, whether a particular guideline exists, whether a specialist was consulted. Each fact is either known or unknown to the physician. For *n* relevant facts, there are 2^n possible epistemic states.
+
+For each epistemic state, we construct a model and ask:
+
+1. **What are the physician's obligations in this state?** (duty checking)
+2. **Does a proposed action comply?** (compliance checking)
+3. **Can all obligations be simultaneously satisfied?** (joint fulfillment)
+
+The result is not a single answer but a **landscape**---a map from knowledge states to normative conclusions.
+
+### 10.3 A Worked Example: Sepsis Screening
+
+Consider a sepsis guideline: "If the patient meets SIRS criteria and has a suspected infection, administer antibiotics within one hour." The epistemically relevant facts are:
+
+- *sirs*: the patient meets SIRS criteria
+- *infection*: the patient has a suspected infection
+- *allergy*: the patient has a relevant drug allergy
+
+This gives 2^3 = 8 possible epistemic states. For each, the guideline's obligations differ:
+
+| Knows SIRS? | Knows infection? | Knows allergy? | Obligation |
+|-------------|-----------------|----------------|------------|
+| No | No | No | No sepsis-related obligation |
+| Yes | No | No | Investigate for infection |
+| No | Yes | No | No sepsis-related obligation (SIRS not confirmed) |
+| Yes | Yes | No | Administer antibiotics within 1 hour |
+| Yes | Yes | Yes | Administer *alternative* antibiotics within 1 hour |
+| Yes | No | Yes | Investigate for infection |
+| No | Yes | Yes | No sepsis-related obligation |
+| No | No | Yes | No sepsis-related obligation |
+
+The simulation reveals that the obligation to treat fires in only 2 of 8 states, and that knowing the allergy *modifies* the obligation (alternative formulary) rather than removing it. More importantly, it reveals that the obligation is **epistemically fragile**: a physician who knows SIRS but not infection status is in a fundamentally different normative position from one who knows both. The single fact *infection* is the highest-value piece of information for resolving normative uncertainty.
+
+### 10.4 What Simulation Reveals
+
+Systematic epistemic simulation produces insights that no individual case assessment can:
+
+**Fragility analysis.** A guideline is *epistemically fragile* if small changes in the physician's knowledge produce large changes in the obligation set. If learning one lab result flips five obligations, the guideline is fragile at that information boundary. Fragile guidelines are more dangerous in practice because routine communication failures (a missed lab result, an unread consult note) produce outsized normative consequences.
+
+**Information value ranking.** For each unknown fact, compute how much the obligation landscape changes when it becomes known. Facts that resolve the most obligation conflicts or eliminate the most uncertainty are the most valuable. This produces a *normative information value* ranking---analogous to the clinical concept of pre-test probability, but applied to obligations rather than diagnoses. This ranking could guide which tests to order first, which consult notes to read first, and which handoff communications are most critical.
+
+**Worst-case analysis.** Across all plausible knowledge states, what is the worst outcome? Are there states where the guideline produces contradictory obligations with no compliant action? These are design flaws in the guideline itself, independent of any individual physician. A guideline that never produces impossible obligation sets across any knowledge state is *epistemically robust*; one that does has a structural vulnerability.
+
+**Robust compliance.** An action is *robustly compliant* if it satisfies obligations not just in one knowledge state but across a range of states. A physician uncertain about a drug allergy might choose an antibiotic that is compliant regardless of allergy status. Simulation identifies these "epistemically safe" choices---actions that are compliant under uncertainty.
+
+**Blame attribution boundaries.** Rather than determining whether a specific physician acted knowingly, recklessly, or negligently, simulation maps out the *boundaries* between these categories. Given the space of possible knowledge states, which states would make the physician's action count as "knowing" non-compliance? Which as "negligent"? This does not require knowing the physician's actual state---it produces a map that can be applied when additional evidence about what the physician knew becomes available (e.g., through chart review or testimony).
+
+### 10.5 Implementation
+
+The simulation is feasible with gamen-hs's existing capabilities. The algorithm:
+
+1. **Define epistemic variables**: the set of facts relevant to the clinical scenario (lab results, history items, guideline awareness, etc.)
+2. **Generate the powerset of knowledge states**: for *n* facts, enumerate all 2^n combinations of known/unknown. Each combination defines which worlds are epistemically accessible to the physician.
+3. **For each knowledge state, build a model**: construct a deontic STIT model where the physician's epistemic state determines which worlds they consider possible.
+4. **Run normative analysis**: for each model, execute duty checking, compliance checking, and joint fulfillment checking.
+5. **Aggregate and visualize**: produce the landscape map---a table or graph showing how obligations, compliance, and conflicts vary across epistemic states.
+
+For typical clinical scenarios with 5--10 epistemically relevant facts, the simulation involves 32--1024 models, each small (the worlds correspond to possible clinical states, not to the epistemic states themselves). This is computationally tractable on modern hardware.
+
+### 10.6 Evaluating Guideline Design, Not Physician Behavior
+
+The deepest implication of epistemic simulation is that it shifts the object of evaluation. Rather than asking "did this physician follow the guideline?" (which requires knowing their epistemic state), we ask "**is this guideline well-designed?**"---meaning: does the guideline produce clear, non-conflicting, achievable obligations across the realistic range of physician knowledge states?
+
+A guideline that produces contradictory obligations when a common piece of information is missing is *poorly designed*, regardless of whether any specific physician has encountered the contradiction. A guideline that requires information the physician cannot reasonably be expected to have is *epistemically unreasonable*, even if it is clinically sound in full-information settings.
+
+This perspective aligns with quality improvement principles: rather than blaming individuals for system failures, identify and fix the system-level design flaws that make failures likely. Epistemic simulation provides the formal machinery to do this for clinical guidelines.
+
+---
+
+## 11. Conclusion
 
 gamen-hs provides the first software implementation of STIT logic---a formal framework for reasoning about agency, choice, obligation, and time. By grounding clinical guideline formalization in mathematically rigorous semantics, gamen-hs enables questions that no existing clinical informatics tool can answer: What are the clinician's obligations? Does the proposed action comply? Can all applicable guidelines be simultaneously satisfied? Who is responsible for a particular outcome?
+
+The epistemic simulation approach (Section 10) addresses the most common objection to formal epistemic reasoning in healthcare: that we cannot know what a physician knows. By enumerating knowledge states rather than measuring them, we transform an intractable epistemological problem into a tractable computational one, and shift the object of evaluation from individual clinicians to guideline design itself.
 
 The framework is implemented in Haskell for correctness, validated against 171 tests traced to published mathematical definitions, and designed for extension to new logics and clinical domains. While significant work remains---particularly the automated proof engine, natural-language interface, and validation against real guidelines---the foundation is in place for a new approach to clinical guideline validation grounded in the formal theory of agency and obligation.
 
