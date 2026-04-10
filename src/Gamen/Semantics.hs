@@ -9,6 +9,8 @@ module Gamen.Semantics
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 
+import Data.Set qualified as Set
+
 import Gamen.Formula
 import Gamen.Kripke
 
@@ -56,6 +58,55 @@ satisfies m w (Box f) =
 -- 8. M, w ⊩ ◇A iff M, w' ⊩ A for some w' with Rww'
 satisfies m w (Diamond f) =
   any (\w' -> satisfies m w' f) (accessible (frame m) w)
+
+-- Temporal operators (Definition 14.4, B&D)
+-- The accessibility relation represents precedence: t ≺ t' stored as t → t'.
+
+-- M, t ⊩ GA iff M, t' ⊩ A for all t' with t ≺ t'
+satisfies m t (FutureBox f) =
+  all (\t' -> satisfies m t' f) (accessible (frame m) t)
+
+-- M, t ⊩ FA iff M, t' ⊩ A for some t' with t ≺ t'
+satisfies m t (FutureDiamond f) =
+  any (\t' -> satisfies m t' f) (accessible (frame m) t)
+
+-- M, t ⊩ HA iff M, t' ⊩ A for all t' with t' ≺ t (predecessors of t)
+satisfies m t (PastBox f) =
+  all (\t' -> not (Set.member t (accessible (frame m) t'))
+           || satisfies m t' f) (worlds (frame m))
+
+-- M, t ⊩ PA iff M, t' ⊩ A for some t' with t' ≺ t (predecessors of t)
+satisfies m t (PastDiamond f) =
+  any (\t' -> Set.member t (accessible (frame m) t')
+           && satisfies m t' f) (worlds (frame m))
+
+-- M, t ⊩ S B C iff ∃t' ≺ t: M,t' ⊩ B and ∀s (t' ≺ s ≺ t → M,s ⊩ C)
+satisfies m t (Since b c) =
+  any (\t' -> Set.member t (accessible (frame m) t')
+           && satisfies m t' b
+           && all (\s -> s == t' || s == t
+                      || not (Set.member s (accessible (frame m) t')
+                           && Set.member t (accessible (frame m) s))
+                      || satisfies m s c)
+                  (worlds (frame m)))
+      (worlds (frame m))
+
+-- M, t ⊩ U B C iff ∃t' with t ≺ t': M,t' ⊩ B and ∀s (t ≺ s ≺ t' → M,s ⊩ C)
+satisfies m t (Until b c) =
+  any (\t' -> satisfies m t' b
+           && all (\s -> s == t || s == t'
+                      || not (Set.member s (accessible (frame m) t)
+                           && Set.member t' (accessible (frame m) s))
+                      || satisfies m s c)
+                  (worlds (frame m)))
+      (accessible (frame m) t)
+
+-- Epistemic operators: not applicable to regular Kripke models.
+-- Use Gamen.Epistemic for multi-agent epistemic models.
+satisfies _ _ (Knowledge _ _) =
+  error "Knowledge operator requires an EpistemicModel (use Gamen.Epistemic)"
+satisfies _ _ (Announce _ _) =
+  error "Announce operator requires an EpistemicModel (use Gamen.Epistemic)"
 
 -- | A formula is true in a model if it holds at every world
 -- (Definition 1.9, B&D).

@@ -29,6 +29,14 @@ data Formula
   | Iff Formula Formula       -- ^ A ↔ B
   | Box Formula               -- ^ □A (necessity)
   | Diamond Formula           -- ^ ◇A (possibility)
+  | FutureBox Formula         -- ^ GA (always in the future)
+  | FutureDiamond Formula     -- ^ FA (eventually)
+  | PastBox Formula           -- ^ HA (historically)
+  | PastDiamond Formula       -- ^ PA (previously)
+  | Since Formula Formula     -- ^ S B C (B since C)
+  | Until Formula Formula     -- ^ U B C (B until C)
+  | Knowledge String Formula  -- ^ K_a A (agent a knows A)
+  | Announce Formula Formula  -- ^ [B]C (public announcement)
   deriving (Eq, Ord)
 
 -- | ⊤ abbreviates ¬⊥ (Definition 1.3, item 1).
@@ -54,6 +62,18 @@ instance Show Formula where
     shows l . showString " ↔ " . shows r
   showsPrec _ (Box f)       = showString "□" . showsPrec 10 f
   showsPrec _ (Diamond f)   = showString "◇" . showsPrec 10 f
+  showsPrec _ (FutureBox f)    = showString "G" . showsPrec 10 f
+  showsPrec _ (FutureDiamond f) = showString "F" . showsPrec 10 f
+  showsPrec _ (PastBox f)      = showString "H" . showsPrec 10 f
+  showsPrec _ (PastDiamond f)  = showString "P" . showsPrec 10 f
+  showsPrec _ (Since l r)   = showParen True $
+    shows l . showString " S " . shows r
+  showsPrec _ (Until l r)   = showParen True $
+    shows l . showString " U " . shows r
+  showsPrec _ (Knowledge a f) = showString "K[" . showString a
+    . showString "]" . showsPrec 10 f
+  showsPrec _ (Announce b c) = showString "[" . shows b
+    . showString "]" . showsPrec 10 c
 
 -- | True if the formula contains no □ or ◇ operators.
 --
@@ -68,8 +88,16 @@ isModalFree (And l r)     = isModalFree l && isModalFree r
 isModalFree (Or l r)      = isModalFree l && isModalFree r
 isModalFree (Implies l r) = isModalFree l && isModalFree r
 isModalFree (Iff l r)     = isModalFree l && isModalFree r
-isModalFree (Box _)       = False
-isModalFree (Diamond _)   = False
+isModalFree (Box _)           = False
+isModalFree (Diamond _)       = False
+isModalFree (FutureBox _)     = False
+isModalFree (FutureDiamond _) = False
+isModalFree (PastBox _)       = False
+isModalFree (PastDiamond _)   = False
+isModalFree (Since _ _)       = False
+isModalFree (Until _ _)       = False
+isModalFree (Knowledge _ _)   = False
+isModalFree (Announce _ _)    = False
 
 -- | Collect all atomic proposition names in a formula.
 --
@@ -83,5 +111,13 @@ atoms (And l r)     = atoms l `Set.union` atoms r
 atoms (Or l r)      = atoms l `Set.union` atoms r
 atoms (Implies l r) = atoms l `Set.union` atoms r
 atoms (Iff l r)     = atoms l `Set.union` atoms r
-atoms (Box f)       = atoms f
-atoms (Diamond f)   = atoms f
+atoms (Box f)           = atoms f
+atoms (Diamond f)       = atoms f
+atoms (FutureBox f)     = atoms f
+atoms (FutureDiamond f) = atoms f
+atoms (PastBox f)       = atoms f
+atoms (PastDiamond f)   = atoms f
+atoms (Since l r)       = atoms l `Set.union` atoms r
+atoms (Until l r)       = atoms l `Set.union` atoms r
+atoms (Knowledge _ f)   = atoms f
+atoms (Announce b c)    = atoms b `Set.union` atoms c

@@ -13,9 +13,13 @@ build-type:      Simple
 
 library
   exposed-modules:
+    Gamen.Epistemic
     Gamen.Formula
+    Gamen.FrameProperties
     Gamen.Kripke
     Gamen.Semantics
+    Gamen.Tableau
+    Gamen.Temporal
   hs-source-dirs:   src
   default-language: GHC2021
   build-depends:

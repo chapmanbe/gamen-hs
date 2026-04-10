@@ -24,10 +24,10 @@ Key Julia files and their Haskell counterparts:
 | `src/formulas.jl` | `src/Gamen/Formula.hs` | Done |
 | `src/kripke.jl` | `src/Gamen/Kripke.hs` | Done |
 | `src/semantics.jl` | `src/Gamen/Semantics.hs` | Done |
-| `src/frame_properties.jl` | `src/Gamen/FrameProperties.hs` | Not started |
-| `src/tableaux.jl` | `src/Gamen/Tableau.hs` | Not started |
-| `src/temporal.jl` | `src/Gamen/Temporal.hs` | Not started |
-| `src/epistemic.jl` | `src/Gamen/Epistemic.hs` | Not started |
+| `src/frame_properties.jl` | `src/Gamen/FrameProperties.hs` | Done |
+| `src/tableaux.jl` | `src/Gamen/Tableau.hs` | Done |
+| `src/temporal.jl` | `src/Gamen/Temporal.hs` | Done |
+| `src/epistemic.jl` | `src/Gamen/Epistemic.hs` | Done |
 
 ## Build System
 
