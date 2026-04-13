@@ -138,10 +138,11 @@ pfFalse σ = PF σ F
 -- | A branch in a prefixed tableau.
 --
 -- Uses a 'Set' alongside the list for O(log n) membership checks,
--- a cached prefix set for O(log n) used-prefix queries, and an
--- 'IntSet' tracking which formula indices have been fully expanded
--- (propositional rules only fire once; modal rules may re-fire
--- when new worlds are created).
+-- a cached prefix set for O(log n) used-prefix queries, an
+-- 'IntSet' tracking which formula indices have been fully expanded,
+-- and a 'Set Prefix' of blocked prefixes (worlds whose formula
+-- content is a subset of an ancestor's, making further expansion
+-- redundant).
 --
 -- @scanStart@ tracks where priority-1 scanning resumes.
 -- World-creating rules reset both @scanStart@ and @branchExpanded@.
@@ -150,6 +151,7 @@ data Branch = Branch
   , branchSet       :: Set PrefixedFormula   -- ^ O(log n) membership
   , branchPrefixes  :: Set Prefix            -- ^ O(log n) used-prefix queries
   , branchExpanded  :: IntSet                -- ^ Indices of fully-expanded formulas
+  , branchBlocked   :: Set Prefix            -- ^ Blocked prefixes (redundant worlds)
   , scanStart       :: Int
   }
 
@@ -171,6 +173,7 @@ mkBranch pfs = Branch
   , branchSet      = Set.fromList pfs
   , branchPrefixes = Set.fromList (map pfPrefix pfs)
   , branchExpanded = IntSet.empty
+  , branchBlocked  = Set.empty
   , scanStart      = 0
   }
 
@@ -221,6 +224,47 @@ isPropositional (Or _ _)      = True
 isPropositional (Implies _ _) = True
 isPropositional (Iff _ _)     = True
 isPropositional _             = False
+
+-- --------------------------------------------------------------------
+-- Blocking (prevents infinite expansion of temporal formulas)
+-- --------------------------------------------------------------------
+
+-- | The formula content at a prefix: set of (sign, formula) pairs.
+prefixContent :: Branch -> Prefix -> Set (Sign, Formula)
+prefixContent branch σ = Set.fromList
+  [ (pfSign pf, pfFormula pf)
+  | pf <- branchFormulas branch
+  , pfPrefix pf == σ
+  ]
+
+-- | All proper ancestor prefixes, from root to parent.
+-- E.g., ancestors (Prefix [1,2,3]) = [Prefix [1], Prefix [1,2]]
+ancestors :: Prefix -> [Prefix]
+ancestors (Prefix ns) = [Prefix (take k ns) | k <- [1 .. length ns - 1]]
+
+-- | Should this prefix be blocked? True if an ancestor has a superset
+-- (or equal set) of the same formulas, making further expansion redundant.
+shouldBlock :: Branch -> Prefix -> Bool
+shouldBlock branch σ
+  | Set.member σ (branchBlocked branch) = True
+  | prefixLength σ <= 1 = False  -- root is never blocked
+  | otherwise =
+      let σContent = prefixContent branch σ
+      in any (\anc -> σContent `Set.isSubsetOf` prefixContent branch anc)
+             (ancestors σ)
+
+-- | Check all newly created prefixes for blocking.
+checkNewBlocking :: Branch -> Set Prefix -> Branch
+checkNewBlocking branch oldPrefixes =
+  let newPrefixes = Set.difference (branchPrefixes branch) oldPrefixes
+      newBlocked = Set.filter (shouldBlock branch) newPrefixes
+  in if Set.null newBlocked
+     then branch
+     else branch { branchBlocked = Set.union (branchBlocked branch) newBlocked }
+
+-- | Is a prefix blocked?
+isBlocked :: Branch -> Prefix -> Bool
+isBlocked branch σ = Set.member σ (branchBlocked branch)
 
 -- --------------------------------------------------------------------
 -- Rule results
@@ -584,7 +628,8 @@ tryPriority1Pass sys branch =
       | IntSet.member i (branchExpanded branch) = go (i + 1) pfs n
       | otherwise =
         let pf = pfs !! i
-        in case pfFormula pf of
+        in if isBlocked branch (pfPrefix pf) then go (i + 1) pfs n  -- skip blocked prefixes
+        else case pfFormula pf of
           Atom _ -> go (i + 1) pfs n
           Bot    -> go (i + 1) pfs n
           _ -> case tryPriority1 sys pf branch of
@@ -625,7 +670,10 @@ tryPriority1Pass sys branch =
 tryBoxFalsePass :: Branch -> Maybe [Branch]
 tryBoxFalsePass branch =
   let pfs = branchFormulas branch
-  in case find (\pf -> isBoxLikeFalse pf && not (isWitnessed pf)) pfs of
+      candidates = filter (\pf -> isBoxLikeFalse pf
+                                && not (isWitnessed pf)
+                                && not (isBlocked branch (pfPrefix pf))) pfs
+  in case find (const True) candidates of
     Nothing -> Nothing
     Just pf ->
       let rule = case pfFormula pf of
@@ -635,10 +683,14 @@ tryBoxFalsePass branch =
       in case rule pf branch of
         NoRule -> Nothing
         Stack additions ->
-          let newBranch = addUnique branch additions
+          let oldPrefixes = branchPrefixes branch
+              newBranch = addUnique branch additions
           in if newBranch == branch
              then Nothing
-             else Just [newBranch { scanStart = 0, branchExpanded = IntSet.empty }]
+             else let checked = checkNewBlocking
+                        (newBranch { scanStart = 0, branchExpanded = IntSet.empty })
+                        oldPrefixes
+                  in Just [checked]
         Split {} -> Nothing
   where
     isBoxLikeFalse (PF _ F (Box _))       = True
@@ -654,7 +706,10 @@ tryBoxFalsePass branch =
 tryDiamondTruePass :: Branch -> Maybe [Branch]
 tryDiamondTruePass branch =
   let pfs = branchFormulas branch
-  in case find (\pf -> isDiamondLikeTrue pf && not (isWitnessed pf)) pfs of
+      candidates = filter (\pf -> isDiamondLikeTrue pf
+                                && not (isWitnessed pf)
+                                && not (isBlocked branch (pfPrefix pf))) pfs
+  in case find (const True) candidates of
     Nothing -> Nothing
     Just pf ->
       let rule = case pfFormula pf of
@@ -664,10 +719,14 @@ tryDiamondTruePass branch =
       in case rule pf branch of
         NoRule -> Nothing
         Stack additions ->
-          let newBranch = addUnique branch additions
+          let oldPrefixes = branchPrefixes branch
+              newBranch = addUnique branch additions
           in if newBranch == branch
              then Nothing
-             else Just [newBranch { scanStart = 0, branchExpanded = IntSet.empty }]
+             else let checked = checkNewBlocking
+                        (newBranch { scanStart = 0, branchExpanded = IntSet.empty })
+                        oldPrefixes
+                  in Just [checked]
         Split {} -> Nothing
   where
     isDiamondLikeTrue (PF _ T (Diamond _))       = True
@@ -687,16 +746,22 @@ tryWitnessPass sys branch
     in go pfs
   where
     go [] = Nothing
-    go (pf:rest) = case pfFormula pf of
+    go (pf:rest)
+      | isBlocked branch (pfPrefix pf) = go rest  -- skip blocked prefixes
+      | otherwise = case pfFormula pf of
       Atom _ -> go rest
       Bot    -> go rest
       _ -> case tryRules (witnessRules sys) pf branch of
         NoRule -> go rest
         Stack additions ->
-          let newBranch = addUnique branch additions
+          let oldPrefixes = branchPrefixes branch
+              newBranch = addUnique branch additions
           in if newBranch == branch
              then go rest
-             else Just [newBranch { scanStart = 0, branchExpanded = IntSet.empty }]
+             else let checked = checkNewBlocking
+                        (newBranch { scanStart = 0, branchExpanded = IntSet.empty })
+                        oldPrefixes
+                  in Just [checked]
         Split {} -> go rest  -- witness rules don't split
 
 -- | Add formulas to a branch, skipping duplicates.
