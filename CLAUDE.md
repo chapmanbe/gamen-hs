@@ -2,40 +2,41 @@
 
 ## Project Description
 
-gamen-hs — a Haskell implementation of modal logic and game-theoretic reasoning. Port of [Gamen.jl](https://github.com/chapmanbe/Gamen.jl) (Julia). Named from Old English *gamen* (game, sport, joy).
+gamen-hs — a Haskell framework for modal logic, temporal logic, epistemic logic, and STIT (Seeing To It That) logic with applications to clinical guideline validation. Originally a port of [Gamen.jl](https://github.com/chapmanbe/Gamen.jl) (Julia), now extended well beyond the Julia version with STIT agency, deontic obligation, and finite grounded models.
+
+Named from Old English *gamen* (game, sport, joy).
 
 This is a collaborative project between Brian Chapman (health informatics researcher, UT Southwestern) and Jeremiah Chapman (MS in logic, thesis on epistemic logic + game theory).
 
 ## Goals
 
-1. **Port Gamen.jl's core logic to Haskell** — formulas, Kripke semantics, tableau prover, deontic-temporal reasoning
-2. **Leverage Haskell's type system** — exhaustive pattern matching catches bugs that Julia misses (e.g., the `_collect_atoms!` and SplitRule bugs found in Gamen.jl)
-3. **Build Haskell skills** — Brian is learning Haskell; Jeremiah's PhD targets list Haskell as a desired skill
-4. **Eventually support epistemic logic + game theory** — connects to Jeremiah's thesis area
+1. **Core modal logic in Haskell** — formulas, Kripke semantics, tableau prover, deontic-temporal reasoning (complete)
+2. **Leverage Haskell's type system** — exhaustive pattern matching catches bugs that Julia misses
+3. **STIT logic for clinical guideline validation** — agency, choice, obligation, permission; duty checking, compliance checking, joint fulfillment
+4. **Build Haskell skills** — Brian is learning Haskell; Jeremiah's PhD targets list Haskell as a desired skill
+5. **Eventually: labeled sequent proof engine for deontic STIT** (Lyon & van Berkel 2024) and epistemic XSTIT (Broersen 2011)
 
-## Relationship to Gamen.jl
+## Module Status
 
-The Julia version at `~/Code/Julia/Gamen.jl` is the reference implementation. This Haskell port follows the same B&D chapter structure. When porting, read the Julia source for implementation details and the B&D textbook for definitions.
-
-Key Julia files and their Haskell counterparts:
-
-| Julia | Haskell | Status |
-|-------|---------|--------|
-| `src/formulas.jl` | `src/Gamen/Formula.hs` | Done |
-| `src/kripke.jl` | `src/Gamen/Kripke.hs` | Done |
-| `src/semantics.jl` | `src/Gamen/Semantics.hs` | Done |
-| `src/frame_properties.jl` | `src/Gamen/FrameProperties.hs` | Done |
-| `src/tableaux.jl` | `src/Gamen/Tableau.hs` | Done |
-| `src/temporal.jl` | `src/Gamen/Temporal.hs` | Done |
-| `src/epistemic.jl` | `src/Gamen/Epistemic.hs` | Done |
+| Module | Source | Status | Description |
+|--------|--------|--------|-------------|
+| `Gamen.Formula` | B&D + STIT papers | Done | 24-constructor formula ADT |
+| `Gamen.Kripke` | B&D Ch. 1 | Done | Kripke frames and models |
+| `Gamen.Semantics` | B&D Ch. 1 | Done | Satisfaction relation |
+| `Gamen.FrameProperties` | B&D Ch. 2 | Done | Frame predicates + frame validity |
+| `Gamen.Tableau` | B&D Ch. 6 | Done | Prefixed tableau for K/KT/KD/KB/K4/S4/S5 with blocking |
+| `Gamen.Temporal` | B&D Ch. 14 | Done | G/F/H/P operators, KDt system |
+| `Gamen.Epistemic` | B&D Ch. 15 | Done | Multi-agent knowledge, announcements, bisimulation |
+| `Gamen.Stit` | Lorini 2013 | Done | T-STIT model checking, constraint C1-C7 |
+| `Gamen.Laca` | Herzig et al. 2022 | Done | Finite control-and-attempt STIT |
+| `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT: ought/permitted, duty/compliance/fulfillment |
 
 ## Build System
 
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests
-- `cabal run gamen-repl` — run demo
+- `cabal test --enable-tests` — run tests (171 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
@@ -43,37 +44,58 @@ Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 - Follow standard Haskell style: camelCase for functions/variables, PascalCase for types/constructors
 - Use `GHC2021` language standard (enables common extensions by default)
 - Use qualified imports for containers: `import Data.Map.Strict qualified as Map`
-- Every function on `Formula` must handle all constructors — rely on GHC's exhaustiveness warnings
+- Every function on `Formula` must handle all 24 constructors — rely on GHC's exhaustiveness warnings
 - Modules under `Gamen.*` namespace
 - Tests use hspec
 
 ## Architecture
 
-The Haskell version follows the same separation of concerns as Gamen.jl:
+### Formula ADT (24 constructors)
 
-- **Syntax** (`Gamen.Formula`) — formula ADT
-- **Semantics** (`Gamen.Kripke`, `Gamen.Semantics`) — Kripke frames, models, satisfaction
-- **Frame conditions** — frame properties as predicates (not yet ported)
-- **Proof procedure** — tableau rules (not yet ported)
+Single closed algebraic data type. Adding a constructor requires updating every pattern-matching function — the compiler enforces this. Constructors span:
+- Propositional: Bot, Atom, Not, And, Or, Implies, Iff
+- Modal: Box, Diamond
+- Temporal: FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until
+- Epistemic: Knowledge, Announce
+- STIT: Stit, GroupStit, Settled, Next
+- Deontic STIT: Ought, Permitted
 
-The key architectural difference from Julia: Formula is a closed algebraic data type, not an open type hierarchy. Adding a new constructor (e.g., `FutureBox`) requires updating every function that pattern-matches on Formula — but the compiler tells you exactly which ones.
+### Model Types
+
+Each logic has its own model type with its own satisfaction function:
+- `Model` / `satisfies` — basic Kripke (single relation)
+- `EpistemicModel` / `eSatisfies` — multi-agent (per-agent relations)
+- `StitModel` / `sSatisfies` — T-STIT (6 named relations + constraints)
+- `LacaModel` / `lSatisfies` — LACA (control function + successor)
+- `DSModel` / `dsSatisfies` — Deontic STIT (choice + ideal sets)
+
+### Tableau Prover
+
+Prefixed signed tableaux with:
+- Configurable systems via `System` type (usedPrefixRules + witnessRules)
+- Set-based membership (O(log n) via `branchSet`)
+- Expanded formula tracking (skip already-processed propositional formulas)
+- Ancestor-based blocking (prevents infinite temporal expansion)
+- Countermodel extraction from open branches
 
 ## Key References
 
-- **Boxes and Diamonds (B&D)**: Primary textbook. Local PDF at `~/Code/Julia/Gamen.jl/notes/bd-screen.pdf`. Online: [bd.openlogicproject.org](https://bd.openlogicproject.org)
-- **Gamen.jl source**: `~/Code/Julia/Gamen.jl/src/` — reference implementation
-- **Gamen.jl CLAUDE.md**: `~/Code/Julia/Gamen.jl/CLAUDE.md` — full architectural principles and chapter workflow
+- **Boxes and Diamonds (B&D)**: Primary textbook. Local PDF at `notes/bd-screen.pdf`. Online: [bd.openlogicproject.org](https://bd.openlogicproject.org)
+- **Blackburn, de Rijke & Venema (2001)**: *Modal Logic* (Cambridge) — parametric semantics, Sahlqvist correspondence
+- **Lorini (2013)**: Temporal STIT logic — T-STIT model checking (Phase 1)
+- **Herzig, Lorini & Perrotin (2022)**: LACA — finite grounded STIT (Phase 2)
+- **Lyon & van Berkel (2024)**: Deontic STIT proof theory — duty/compliance/fulfillment (Phase 3)
+- **Broersen (2011)**: XSTIT epistemic deontic — mens rea categories (Phase 4, not yet implemented)
+- **Gamen.jl source**: `~/Code/Julia/Gamen.jl/src/` — original reference implementation
 
-## Porting Workflow
+## Documentation
 
-When porting a new B&D chapter:
-
-1. Read the Julia implementation in `~/Code/Julia/Gamen.jl/src/`
-2. Read the relevant B&D chapter definitions
-3. Create `src/Gamen/<Module>.hs` with the Haskell implementation
-4. Add the module to `exposed-modules` in `gamen.cabal`
-5. Port the corresponding Julia tests to hspec in `test/Main.hs`
-6. Run `cabal test --enable-tests`
+- `whitepaper/gamen-hs-whitepaper-v2.md` — full whitepaper with health sciences applications
+- `whitepaper/references.bib` — BibLaTeX bibliography
+- `notes/stit-logics-review.md` — literature review of 4 STIT papers
+- `notes/haskell-landscape.md` — Haskell ecosystem assessment
+- `notes/tableau_optimization.md` — set-based membership optimization notes
+- `notes/tableau_blocking.md` — blocking optimization notes
 
 ## Dependencies
 
