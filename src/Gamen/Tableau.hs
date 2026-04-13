@@ -48,6 +48,8 @@ module Gamen.Tableau
   , extractCountermodel
   ) where
 
+import Data.IntSet (IntSet)
+import Data.IntSet qualified as IntSet
 import Data.List (find)
 import Data.Map.Strict qualified as Map
 import Data.Set (Set)
@@ -135,15 +137,26 @@ pfFalse σ = PF σ F
 
 -- | A branch in a prefixed tableau.
 --
--- @scanStart@ tracks where priority-1 scanning resumes. Formulas
--- before this index returned NoRule on the previous pass and haven't
--- been invalidated by new child prefixes. World-creating rules
--- reset scanStart to 0 because □T/◇F may need to propagate to
--- the new child.
+-- Uses a 'Set' alongside the list for O(log n) membership checks,
+-- a cached prefix set for O(log n) used-prefix queries, and an
+-- 'IntSet' tracking which formula indices have been fully expanded
+-- (propositional rules only fire once; modal rules may re-fire
+-- when new worlds are created).
+--
+-- @scanStart@ tracks where priority-1 scanning resumes.
+-- World-creating rules reset both @scanStart@ and @branchExpanded@.
 data Branch = Branch
-  { branchFormulas :: [PrefixedFormula]
-  , scanStart      :: Int
-  } deriving (Eq)
+  { branchFormulas  :: [PrefixedFormula]
+  , branchSet       :: Set PrefixedFormula   -- ^ O(log n) membership
+  , branchPrefixes  :: Set Prefix            -- ^ O(log n) used-prefix queries
+  , branchExpanded  :: IntSet                -- ^ Indices of fully-expanded formulas
+  , scanStart       :: Int
+  }
+
+-- | Set-based equality: two branches are equal if they contain the
+-- same formulas, regardless of insertion order.
+instance Eq Branch where
+  a == b = branchSet a == branchSet b
 
 instance Show Branch where
   show b =
@@ -153,43 +166,61 @@ instance Show Branch where
 
 -- | Construct a branch from a list of assumptions.
 mkBranch :: [PrefixedFormula] -> Branch
-mkBranch pfs = Branch pfs 0
+mkBranch pfs = Branch
+  { branchFormulas = pfs
+  , branchSet      = Set.fromList pfs
+  , branchPrefixes = Set.fromList (map pfPrefix pfs)
+  , branchExpanded = IntSet.empty
+  , scanStart      = 0
+  }
 
 -- | A branch is closed if it contains both σ T A and σ F A
 -- for some prefix σ and formula A (Definition 6.2, B&D).
 isClosed :: Branch -> Bool
-isClosed (Branch pfs _) =
-  let trueSet = Set.fromList [(pfPrefix pf, pfFormula pf)
-                             | pf <- pfs, pfSign pf == T]
-  in any (\pf -> pfSign pf == F
-              && Set.member (pfPrefix pf, pfFormula pf) trueSet) pfs
+isClosed branch =
+  any (\pf -> pfSign pf == T
+           && Set.member (PF (pfPrefix pf) F (pfFormula pf)) (branchSet branch))
+      (branchFormulas branch)
 
--- | All prefixes appearing on a branch.
+-- | All prefixes appearing on a branch (cached).
 usedPrefixes :: Branch -> Set Prefix
-usedPrefixes (Branch pfs _) = Set.fromList (map pfPrefix pfs)
+usedPrefixes = branchPrefixes
 
 -- | A fresh child prefix σ.n not yet on the branch.
 freshPrefix :: Branch -> Prefix -> Prefix
 freshPrefix branch σ = go 1
   where
-    used = usedPrefixes branch
+    used = branchPrefixes branch
     go n = let τ = extendPrefix σ n
            in if Set.member τ used then go (n + 1) else τ
 
 -- | Does a child of σ already witness this sign+formula on the branch?
 hasWitness :: Branch -> Prefix -> Sign -> Formula -> Bool
-hasWitness (Branch pfs _) σ s a =
+hasWitness branch σ s a =
   any (\pf -> pfPrefix pf `isChildOf` σ
            && pfSign pf == s
-           && pfFormula pf == a) pfs
+           && pfFormula pf == a) (branchFormulas branch)
 
--- | Append a formula to a branch (preserving scanStart).
+-- | Append a formula to a branch (maintaining all cached structures).
 appendFormula :: Branch -> PrefixedFormula -> Branch
-appendFormula (Branch pfs ss) pf = Branch (pfs ++ [pf]) ss
+appendFormula branch pf = branch
+  { branchFormulas = branchFormulas branch ++ [pf]
+  , branchSet      = Set.insert pf (branchSet branch)
+  , branchPrefixes = Set.insert (pfPrefix pf) (branchPrefixes branch)
+  }
 
--- | Does the branch already contain this prefixed formula?
+-- | Does the branch already contain this prefixed formula? O(log n).
 branchContains :: Branch -> PrefixedFormula -> Bool
-branchContains (Branch pfs _) pf = pf `elem` pfs
+branchContains branch pf = Set.member pf (branchSet branch)
+
+-- | Is this formula propositional? (Fires at most once, safe to mark expanded.)
+isPropositional :: Formula -> Bool
+isPropositional (Not _)       = True
+isPropositional (And _ _)     = True
+isPropositional (Or _ _)      = True
+isPropositional (Implies _ _) = True
+isPropositional (Iff _ _)     = True
+isPropositional _             = False
 
 -- --------------------------------------------------------------------
 -- Rule results
@@ -540,6 +571,7 @@ applyAllRules sys branch
                   Nothing -> [branch]  -- saturated
 
 -- | Scan formulas from scanStart for priority-1 rules.
+-- Skips indices in branchExpanded (propositional formulas already processed).
 tryPriority1Pass :: System -> Branch -> Maybe [Branch]
 tryPriority1Pass sys branch =
   let pfs = branchFormulas branch
@@ -549,32 +581,47 @@ tryPriority1Pass sys branch =
   where
     go i pfs n
       | i >= n = Nothing
+      | IntSet.member i (branchExpanded branch) = go (i + 1) pfs n
       | otherwise =
         let pf = pfs !! i
         in case pfFormula pf of
           Atom _ -> go (i + 1) pfs n
           Bot    -> go (i + 1) pfs n
           _ -> case tryPriority1 sys pf branch of
-            NoRule -> go (i + 1) pfs n
+            NoRule ->
+              -- Mark propositional formulas as expanded (they won't produce
+              -- new results). Modal formulas are NOT marked because new
+              -- worlds created by Priority 2 can make them fire again.
+              let expanded' = if isPropositional (pfFormula pf)
+                              then IntSet.insert i (branchExpanded branch)
+                              else branchExpanded branch
+                  branch' = branch { branchExpanded = expanded' }
+              in go (i + 1) pfs n
             Stack additions ->
               let newBranch = addUnique branch additions
-              in if branchFormulas newBranch == branchFormulas branch
+                  expanded' = if isPropositional (pfFormula pf)
+                              then IntSet.insert i (branchExpanded newBranch)
+                              else branchExpanded newBranch
+              in if newBranch == branch
                  then go (i + 1) pfs n  -- all already present
-                 else Just [Branch (branchFormulas newBranch) i]
+                 else Just [newBranch { scanStart = i, branchExpanded = expanded' }]
             Split leftAdds rightAdds ->
               let left  = addUnique branch leftAdds
                   right = addUnique branch rightAdds
-              in if branchFormulas left == branchFormulas branch
-                    && branchFormulas right == branchFormulas branch
+                  expanded' = if isPropositional (pfFormula pf)
+                              then IntSet.insert i (branchExpanded branch)
+                              else branchExpanded branch
+              in if left == branch && right == branch
                  then go (i + 1) pfs n  -- all already present
-                 else if branchFormulas left == branchFormulas branch
-                         || branchFormulas right == branchFormulas branch
+                 else if left == branch || right == branch
                  then go (i + 1) pfs n  -- one arm is parent (skip)
-                 else Just [ Branch (branchFormulas left) i
-                           , Branch (branchFormulas right) i ]
+                 else Just [ left  { scanStart = i, branchExpanded = expanded' }
+                           , right { scanStart = i, branchExpanded = expanded' } ]
 
--- | Try □F and GF rules on all formulas. Resets scanStart on success.
+-- | Try □F and GF rules on all formulas.
 -- Priority 2a: world-creating rules for box-false / futurebox-false.
+-- Resets scanStart AND branchExpanded on success (new worlds mean
+-- modal rules may fire again).
 tryBoxFalsePass :: Branch -> Maybe [Branch]
 tryBoxFalsePass branch =
   let pfs = branchFormulas branch
@@ -589,9 +636,9 @@ tryBoxFalsePass branch =
         NoRule -> Nothing
         Stack additions ->
           let newBranch = addUnique branch additions
-          in if branchFormulas newBranch == branchFormulas branch
+          in if newBranch == branch
              then Nothing
-             else Just [Branch (branchFormulas newBranch) 0]
+             else Just [newBranch { scanStart = 0, branchExpanded = IntSet.empty }]
         Split {} -> Nothing
   where
     isBoxLikeFalse (PF _ F (Box _))       = True
@@ -601,8 +648,9 @@ tryBoxFalsePass branch =
     isWitnessed (PF σ F (FutureBox a)) = hasWitness branch σ F a
     isWitnessed _                      = False
 
--- | Try ◇T and FT rules on all formulas. Resets scanStart on success.
+-- | Try ◇T and FT rules on all formulas.
 -- Priority 2b: world-creating rules for diamond-true / futurediamond-true.
+-- Resets scanStart AND branchExpanded on success.
 tryDiamondTruePass :: Branch -> Maybe [Branch]
 tryDiamondTruePass branch =
   let pfs = branchFormulas branch
@@ -617,9 +665,9 @@ tryDiamondTruePass branch =
         NoRule -> Nothing
         Stack additions ->
           let newBranch = addUnique branch additions
-          in if branchFormulas newBranch == branchFormulas branch
+          in if newBranch == branch
              then Nothing
-             else Just [Branch (branchFormulas newBranch) 0]
+             else Just [newBranch { scanStart = 0, branchExpanded = IntSet.empty }]
         Split {} -> Nothing
   where
     isDiamondLikeTrue (PF _ T (Diamond _))       = True
@@ -629,7 +677,8 @@ tryDiamondTruePass branch =
     isWitnessed (PF σ T (FutureDiamond a)) = hasWitness branch σ T a
     isWitnessed _                          = False
 
--- | Try witness-creation rules (priority 2c). Resets scanStart on success.
+-- | Try witness-creation rules (priority 2c).
+-- Resets scanStart AND branchExpanded on success.
 tryWitnessPass :: System -> Branch -> Maybe [Branch]
 tryWitnessPass sys branch
   | null (witnessRules sys) = Nothing
@@ -645,9 +694,9 @@ tryWitnessPass sys branch
         NoRule -> go rest
         Stack additions ->
           let newBranch = addUnique branch additions
-          in if branchFormulas newBranch == branchFormulas branch
+          in if newBranch == branch
              then go rest
-             else Just [Branch (branchFormulas newBranch) 0]
+             else Just [newBranch { scanStart = 0, branchExpanded = IntSet.empty }]
         Split {} -> go rest  -- witness rules don't split
 
 -- | Add formulas to a branch, skipping duplicates.
@@ -688,7 +737,7 @@ buildTableau sys assumptions maxSteps = go [mkBranch assumptions] 0
           Just (idx, branch) ->
             let newBranches = applyAllRules sys branch
             in if case newBranches of
-                    [b] -> branchFormulas b == branchFormulas branch
+                    [b] -> b == branch
                     _   -> False
                then -- This branch is saturated. Check if others remain.
                     Tableau branches
