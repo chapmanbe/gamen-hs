@@ -4,3 +4,7 @@ cabal.project.local
 *.hi
 *.o
 .ghc.environment.*
+.DS_Store
+
+# Reference paper PDFs (large, keep text versions in guideline-validation repo)
+notes/*.pdf

@@ -23,6 +23,7 @@ library
     Gamen.Stit
     Gamen.Tableau
     Gamen.Temporal
+    Gamen.Xstit
   hs-source-dirs:   src
   default-language: GHC2021
   build-depends:
@@ -47,4 +48,16 @@ executable gamen-repl
   build-depends:
     base >= 4.17 && < 5,
     containers >= 0.6,
+    gamen
+
+executable gamen-validate
+  main-is:          Main.hs
+  hs-source-dirs:   validate
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    aeson >= 2.1,
+    bytestring >= 0.11,
+    containers >= 0.6,
+    text >= 2.0,
     gamen

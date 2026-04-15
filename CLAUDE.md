@@ -30,13 +30,14 @@ This is a collaborative project between Brian Chapman (health informatics resear
 | `Gamen.Stit` | Lorini 2013 | Done | T-STIT model checking, constraint C1-C7 |
 | `Gamen.Laca` | Herzig et al. 2022 | Done | Finite control-and-attempt STIT |
 | `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT: ought/permitted, duty/compliance/fulfillment |
+| `Gamen.Xstit` | Broersen 2011 | Done | Epistemic deontic XSTIT: mens rea, violation constants |
 
 ## Build System
 
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (171 tests)
+- `cabal test --enable-tests` — run tests (190 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
@@ -68,6 +69,7 @@ Each logic has its own model type with its own satisfaction function:
 - `StitModel` / `sSatisfies` — T-STIT (6 named relations + constraints)
 - `LacaModel` / `lSatisfies` — LACA (control function + successor)
 - `DSModel` / `dsSatisfies` — Deontic STIT (choice + ideal sets)
+- `XstitModel` / `xSatisfies` — XSTIT (choice + epistemic + violation constants)
 
 ### Tableau Prover
 

@@ -14,6 +14,7 @@ import Gamen.Semantics
 import Gamen.Stit
 import Gamen.Tableau
 import Gamen.Temporal
+import Gamen.Xstit
 
 main :: IO ()
 main = hspec $ do
@@ -1239,3 +1240,165 @@ main = hspec $ do
       jointFulfillment dsModel' "j" [lj, Not coll] `shouldBe` True
       -- Can Jade jointly fulfill right_jade? ideal_j={w1,w3}, right_jade at neither -> false
       jointFulfillment dsModel' "j" [rj] `shouldBe` False
+
+  -- ================================================================
+  -- XSTIT: Epistemic Deontic STIT (Broersen 2011)
+  -- ================================================================
+
+  -- Clinical prescribing scenario:
+  -- A clinician (agent "c") must prescribe the correct medication.
+  -- The patient has a recorded allergy, but the clinician may or may
+  -- not have read the chart (epistemic uncertainty).
+  --
+  -- 4 worlds encoding 2 moments x 2 histories:
+  --   s0_h1, s0_h2  (moment 0: choice point)
+  --   s1_h1, s1_h2  (moment 1: next states)
+  --
+  -- History h1: clinician prescribes safe medication
+  -- History h2: clinician prescribes unsafe medication
+  --
+  -- R_X (next-state): s0_h1->s1_h1, s0_h2->s1_h2
+  -- R_□ (settledness): {s0_h1, s0_h2} and {s1_h1, s1_h2}
+  -- R_[c] (choice): at moment 0: {s0_h1}, {s0_h2} (clinician picks)
+  --                 at moment 1: {s1_h1}, {s1_h2}
+  -- R_{K_c} (knowledge): at moment 0: {s0_h1, s0_h2} (can't distinguish)
+  --                      at moment 1: {s1_h1}, {s1_h2}
+
+  let xFrame' = mkXstitFrame
+        ["s0_h1", "s0_h2", "s1_h1", "s1_h2"]
+        -- R_X: deterministic next-state
+        [ ("s0_h1", "s1_h1"), ("s0_h2", "s1_h2")
+        , ("s1_h1", "s1_h1"), ("s1_h2", "s1_h2")  -- terminal loops
+        ]
+        -- R_□: settledness (equivalence classes = moments)
+        [ ("s0_h1", "s0_h1"), ("s0_h1", "s0_h2")
+        , ("s0_h2", "s0_h1"), ("s0_h2", "s0_h2")
+        , ("s1_h1", "s1_h1"), ("s1_h1", "s1_h2")
+        , ("s1_h2", "s1_h1"), ("s1_h2", "s1_h2")
+        ]
+        -- R_[c]: clinician's choice (each world is its own cell at both moments)
+        [ ("c", [ ("s0_h1", "s0_h1"), ("s0_h2", "s0_h2")
+                , ("s1_h1", "s1_h1"), ("s1_h2", "s1_h2") ])
+        ]
+        -- R_{K_c}: clinician's knowledge (can't distinguish at moment 0)
+        [ ("c", [ ("s0_h1", "s0_h1"), ("s0_h1", "s0_h2")
+                , ("s0_h2", "s0_h1"), ("s0_h2", "s0_h2")
+                , ("s1_h1", "s1_h1"), ("s1_h2", "s1_h2") ])
+        ]
+
+      xModel' = mkXstitModel xFrame'
+        [ ("safe_med",   ["s1_h1"])
+        , ("unsafe_med", ["s1_h2"])
+        , ("allergy_known", ["s0_h1"])
+        , ("v_c",        ["s1_h2"])  -- violation when unsafe med prescribed
+        ]
+
+      safeMed   = Atom "safe_med"
+      unsafeMed = Atom "unsafe_med"
+
+  describe "XSTIT frame conditions (Broersen 2011, Definition 3.1)" $ do
+
+    it "valid frame passes all conditions" $ do
+      isValidXstitFrame xFrame' `shouldBe` True
+
+    it "XC1: R_X is serial" $ do
+      checkXC1 xFrame' `shouldBe` True
+
+    it "XC2: R_□ is an equivalence relation" $ do
+      checkXC2 xFrame' `shouldBe` True
+
+    it "XC3: R_[A] are equivalence relations" $ do
+      checkXC3 xFrame' `shouldBe` True
+
+    it "XC4: R_[A] refines R_□" $ do
+      checkXC4 xFrame' `shouldBe` True
+
+    it "XC5: independence of agents" $ do
+      checkXC5 xFrame' `shouldBe` True
+
+    it "XC6: R_{K_a} are equivalence relations" $ do
+      checkXC6 xFrame' `shouldBe` True
+
+  describe "XSTIT satisfaction (Broersen 2011, Definition 3.2)" $ do
+
+    it "evaluates Next (next-state)" $ do
+      -- At s0_h1, next state is s1_h1 where safe_med holds
+      xSatisfies xModel' "s0_h1" (Next safeMed) `shouldBe` True
+      -- At s0_h2, next state is s1_h2 where unsafe_med holds
+      xSatisfies xModel' "s0_h2" (Next unsafeMed) `shouldBe` True
+      xSatisfies xModel' "s0_h2" (Next safeMed) `shouldBe` False
+
+    it "evaluates Settled (historical necessity)" $ do
+      -- safe_med is NOT settled at s1_h1 (s1_h2 is in same moment, no safe_med)
+      xSatisfies xModel' "s1_h1" (Settled safeMed) `shouldBe` False
+      -- (safe_med ∨ unsafe_med) IS settled at moment 1
+      xSatisfies xModel' "s1_h1" (Settled (Or safeMed unsafeMed)) `shouldBe` True
+
+    it "evaluates [a xstit]phi (choice guarantees at next state)" $ do
+      -- At s0_h1: clinician's choice cell = {s0_h1}.
+      -- For all w' in {s0_h1}, safe_med holds at R_X(w') = s1_h1. -> true
+      xSatisfies xModel' "s0_h1" (Stit "c" safeMed) `shouldBe` True
+      -- At s0_h2: choice cell = {s0_h2}, R_X(s0_h2) = s1_h2,
+      -- safe_med does NOT hold at s1_h2. -> false
+      xSatisfies xModel' "s0_h2" (Stit "c" safeMed) `shouldBe` False
+      -- At s0_h2: clinician sees to unsafe_med
+      xSatisfies xModel' "s0_h2" (Stit "c" unsafeMed) `shouldBe` True
+
+    it "evaluates K_a phi (epistemic knowledge)" $ do
+      -- At s0_h1: R_{K_c} = {s0_h1, s0_h2}. allergy_known only at s0_h1.
+      -- Not all K-accessible worlds satisfy allergy_known. -> false
+      xSatisfies xModel' "s0_h1" (Knowledge "c" (Atom "allergy_known"))
+        `shouldBe` False
+      -- At s1_h1: R_{K_c} = {s1_h1}. safe_med at s1_h1. -> true
+      xSatisfies xModel' "s1_h1" (Knowledge "c" safeMed) `shouldBe` True
+
+    it "clinician does NOT know they see to safe_med (epistemic uncertainty)" $ do
+      -- K_c [c xstit] safe_med at s0_h1:
+      -- R_{K_c}(s0_h1) = {s0_h1, s0_h2}
+      -- [c xstit]safe_med at s0_h1 = True, at s0_h2 = False
+      -- Not all K-accessible worlds satisfy [c xstit]safe_med. -> false
+      xSatisfies xModel' "s0_h1" (knowingly "c" safeMed) `shouldBe` False
+
+  describe "XSTIT obligation and mens rea (Broersen 2011, Section 5)" $ do
+
+    it "evaluates Ought via violation constants" $ do
+      -- O[c xstit]safe_med at s0_h1:
+      -- = Settled(Not([c xstit]safe_med) -> [c xstit]v_c)
+      -- At s0_h1: [c xstit]safe_med = True, so implication is vacuously true
+      -- At s0_h2: [c xstit]safe_med = False, [c xstit]v_c = True (v_c at s1_h2)
+      -- Both moments satisfy -> true
+      xSatisfies xModel' "s0_h1" (Ought "c" safeMed) `shouldBe` True
+
+    it "evaluates Permitted" $ do
+      -- Clinician is permitted to see to safe_med
+      xSatisfies xModel' "s0_h1" (Permitted "c" safeMed) `shouldBe` True
+
+    it "strict liability at s0_h2" $ do
+      -- At s0_h2: O[c xstit]safe_med AND NOT [c xstit]safe_med
+      xSatisfies xModel' "s0_h2" (strictLiability "c" safeMed) `shouldBe` True
+      -- At s0_h1: clinician DOES see to safe_med, no liability
+      xSatisfies xModel' "s0_h1" (strictLiability "c" safeMed) `shouldBe` False
+
+    it "mens rea classification" $ do
+      -- At s0_h2: clinician violates obligation -> strict liability
+      mensReaCheck xModel' "s0_h2" "c" safeMed `shouldContain` [MRStrictLiability]
+      -- At s0_h1: clinician complies -> no strict liability
+      mensReaCheck xModel' "s0_h1" "c" safeMed `shouldBe` []
+
+  describe "XSTIT application functions" $ do
+
+    it "duty check identifies obligations" $ do
+      xDutyCheck xModel' "s0_h1" "c" [safeMed, unsafeMed]
+        `shouldBe` [safeMed]
+
+    it "knowledge check identifies known facts" $ do
+      -- At s1_h1, clinician knows safe_med (singleton epistemic cell)
+      xKnowledgeCheck xModel' "s1_h1" "c" [safeMed, unsafeMed]
+        `shouldBe` [safeMed]
+
+    it "epistemic duty check: clinician knows obligation but not compliance" $ do
+      let duties = xEpistemicDutyCheck xModel' "s0_h1" "c" [safeMed, unsafeMed]
+      -- safe_med is obligatory; does clinician know the obligation?
+      -- K_c(O[c xstit]safe_med): R_{K_c}(s0_h1)={s0_h1,s0_h2}
+      -- O[c xstit]safe_med true at both -> clinician knows the obligation
+      duties `shouldBe` [(safeMed, True)]
