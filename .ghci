@@ -1,0 +1,43 @@
+-- gamen-hs GHCi configuration
+-- Loaded automatically when you run: cabal repl
+--
+-- This imports commonly-used modules so you can start exploring
+-- immediately without typing import statements.
+
+:set prompt "gamen> "
+:set prompt-cont "  ... "
+
+import Gamen.Formula
+import Gamen.Kripke
+import Gamen.Semantics
+import Gamen.FrameProperties
+import Gamen.Tableau
+import Gamen.Temporal
+import Gamen.Epistemic
+import Gamen.Stit
+import Gamen.Laca
+import Gamen.DeonticStit
+import Gamen.Xstit
+import Data.Set qualified as Set
+import Data.Map.Strict qualified as Map
+
+:set +t
+
+-- Quick reference (type :help for GHCi commands):
+--
+--   let p = Atom "p"
+--   let q = Atom "q"
+--
+--   -- Build a Kripke model
+--   let fr = mkFrame ["w1","w2"] [("w1","w2")]
+--   let m  = mkModel fr [("p", ["w1"]), ("q", ["w2"])]
+--
+--   -- Check satisfaction
+--   satisfies m "w1" (Box p)
+--   satisfies m "w1" (Diamond q)
+--
+--   -- Prove a formula
+--   isProvable systemK (Implies (Box (Implies p q)) (Implies (Box p) (Box q)))
+--
+--   -- Check consistency
+--   isConsistent systemK [Box p, Diamond (Not p)]

@@ -1,0 +1,80 @@
+# Haddock documentation → GitHub Pages
+#
+# How this works:
+#
+# Haddock is Haskell's documentation generator (like Documenter.jl for Julia).
+# It reads the "-- |" comments in your source code and produces HTML pages.
+#
+# This workflow:
+#   1. Builds Haddock docs from your source
+#   2. Deploys them to GitHub Pages
+#
+# The result: your API docs are browsable at
+#   https://<username>.github.io/gamen-hs/
+#
+# Setup (one-time, in GitHub repo settings):
+#   Settings → Pages → Source → "GitHub Actions"
+#   That's it — no gh-pages branch needed.
+
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+
+# Allow this workflow to deploy to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Build & Deploy Docs
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: '9.8'
+
+      # Cache dependencies (same pattern as ci.yml)
+      - name: Configure build
+        run: cabal configure --enable-tests
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ runner.os }}-ghc-docs-${{ hashFiles('**/*.cabal') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-docs-
+
+      # Build Haddock documentation
+      # --haddock-hyperlink-source adds clickable links to source code
+      - name: Build Haddock docs
+        run: |
+          cabal haddock --haddock-hyperlink-source --haddock-quickjump
+          # Copy generated docs to a clean directory for deployment
+          mkdir -p _site
+          cp -r $(find dist-newstyle -path '*/doc/html/gamen' -type d | head -1)/* _site/
+
+      # Deploy to GitHub Pages
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -50,6 +50,31 @@ executable gamen-repl
     containers >= 0.6,
     gamen
 
+executable example-tableau
+  main-is:          Tableau.hs
+  hs-source-dirs:   examples
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    gamen
+
+executable example-deontic-stit
+  main-is:          DeonticStit.hs
+  hs-source-dirs:   examples
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    containers >= 0.6,
+    gamen
+
+executable example-mens-rea
+  main-is:          MensRea.hs
+  hs-source-dirs:   examples
+  default-language: GHC2021
+  build-depends:
+    base >= 4.17 && < 5,
+    gamen
+
 executable gamen-validate
   main-is:          Main.hs
   hs-source-dirs:   validate

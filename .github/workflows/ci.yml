@@ -1,0 +1,84 @@
+# CI for gamen-hs
+#
+# How this works:
+#
+# "on:" — WHEN does this run?
+#   - On every push to main
+#   - On every pull request targeting main
+#   This means: every time you `git push`, GitHub spins up a fresh
+#   Ubuntu VM, installs GHC + cabal, builds the project, and runs tests.
+#   You'll see a green checkmark (pass) or red X (fail) on the commit.
+#
+# "jobs:" — WHAT does it do?
+#   Each job runs on a fresh VM. We have one job: "build".
+#   The "strategy.matrix" lets us test on multiple GHC versions
+#   with a single workflow definition.
+#
+# "steps:" — the sequential commands, like a shell script:
+#   1. Check out the code (actions/checkout)
+#   2. Install GHC and cabal (haskell-actions/setup)
+#   3. Cache dependencies so rebuilds are fast
+#   4. Build the library
+#   5. Run all tests
+
+name: CI
+
+# When to run
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: GHC ${{ matrix.ghc }} — ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    # Test matrix: which combinations of OS and GHC to test.
+    # Start with one combo; expand later if needed.
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        ghc: ['9.8']
+
+    steps:
+      # Step 1: Check out the repository code
+      - uses: actions/checkout@v4
+
+      # Step 2: Install GHC and cabal
+      # haskell-actions/setup is the standard GitHub Action for Haskell.
+      # It installs the specified GHC version and cabal.
+      - uses: haskell-actions/setup@v2
+        id: setup
+        with:
+          ghc-version: ${{ matrix.ghc }}
+
+      # Step 3: Cache cabal's package store and build artifacts.
+      # Without caching, every CI run downloads and compiles all
+      # dependencies from scratch (~2-5 min). With caching, subsequent
+      # runs reuse the compiled dependencies and only rebuild your code.
+      #
+      # The cache key includes the cabal.project.freeze hash, so the
+      # cache is invalidated when dependencies change.
+      - name: Configure build
+        run: |
+          cabal configure --enable-tests
+          cabal build --dry-run
+        # The --dry-run generates a build plan (dist-newstyle/cache/plan.json)
+        # that we use as the cache key.
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ runner.os }}-ghc-${{ matrix.ghc }}-${{ hashFiles('**/plan.json') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-${{ matrix.ghc }}-
+
+      # Step 4: Build the library and executables
+      - name: Build
+        run: cabal build all
+
+      # Step 5: Run the test suite
+      - name: Test
+        run: cabal test --enable-tests --test-show-details=direct

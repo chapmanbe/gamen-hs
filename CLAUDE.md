@@ -87,7 +87,7 @@ Prefixed signed tableaux with:
 - **Lorini (2013)**: Temporal STIT logic — T-STIT model checking (Phase 1)
 - **Herzig, Lorini & Perrotin (2022)**: LACA — finite grounded STIT (Phase 2)
 - **Lyon & van Berkel (2024)**: Deontic STIT proof theory — duty/compliance/fulfillment (Phase 3)
-- **Broersen (2011)**: XSTIT epistemic deontic — mens rea categories (Phase 4, not yet implemented)
+- **Broersen (2011)**: XSTIT epistemic deontic — mens rea categories (Phase 4)
 - **Gamen.jl source**: `~/Code/Julia/Gamen.jl/src/` — original reference implementation
 
 ## Documentation
