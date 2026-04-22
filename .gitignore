@@ -8,3 +8,4 @@ cabal.project.local
 
 # Reference paper PDFs (large, keep text versions in guideline-validation repo)
 notes/*.pdf
+.mmreview/

@@ -704,14 +704,14 @@ main = hspec $ do
         mDirect = mkModel frDirect [("p", ["t1", "t2"]), ("q", ["t3"])]
 
     it "evaluates Until" $ do
-      -- U(q)(p) at t1: t1 sees t3 (q true), t2 between with p true
-      satisfies mDirect "t1" (Until tq tp) `shouldBe` True
-      -- U(q)(q) at t1: need q between, but t2 has no q
+      -- p U q at t1: q eventually at t3 (witness), p at t2 (interval)
+      satisfies mDirect "t1" (Until tp tq) `shouldBe` True
+      -- q U q at t1: need q at intermediates, but t2 has no q
       satisfies mDirect "t1" (Until tq tq) `shouldBe` False
 
     it "evaluates Since" $ do
-      -- S(p)(q) at t3: t2 ≺ t3 and p at t2
-      satisfies mDirect "t3" (Since tp tq) `shouldBe` True
+      -- q S p at t3: p at t2 (witness), no intermediates (vacuous)
+      satisfies mDirect "t3" (Since tq tp) `shouldBe` True
 
   describe "Temporal frame properties (Table 14.1)" $ do
 

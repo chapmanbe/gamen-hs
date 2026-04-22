@@ -9,8 +9,6 @@ module Gamen.Semantics
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 
-import Data.Set qualified as Set
-
 import Gamen.Formula
 import Gamen.Kripke
 
@@ -80,24 +78,26 @@ satisfies m t (PastDiamond f) =
   any (\t' -> Set.member t (accessible (frame m) t')
            && satisfies m t' f) (worlds (frame m))
 
--- M, t ⊩ S B C iff ∃t' ≺ t: M,t' ⊩ B and ∀s (t' ≺ s ≺ t → M,s ⊩ C)
+-- M, t ⊩ B S C iff ∃t' ≺ t: M,t' ⊩ C and ∀s (t' ≺ s ≺ t → M,s ⊩ B)
+-- Standard convention: first arg (B) is the interval, second arg (C) is the witness.
 satisfies m t (Since b c) =
   any (\t' -> Set.member t (accessible (frame m) t')
-           && satisfies m t' b
+           && satisfies m t' c
            && all (\s -> s == t' || s == t
                       || not (Set.member s (accessible (frame m) t')
                            && Set.member t (accessible (frame m) s))
-                      || satisfies m s c)
+                      || satisfies m s b)
                   (worlds (frame m)))
       (worlds (frame m))
 
--- M, t ⊩ U B C iff ∃t' with t ≺ t': M,t' ⊩ B and ∀s (t ≺ s ≺ t' → M,s ⊩ C)
+-- M, t ⊩ B U C iff ∃t' with t ≺ t': M,t' ⊩ C and ∀s (t ≺ s ≺ t' → M,s ⊩ B)
+-- Standard convention: first arg (B) is the interval, second arg (C) is the witness.
 satisfies m t (Until b c) =
-  any (\t' -> satisfies m t' b
+  any (\t' -> satisfies m t' c
            && all (\s -> s == t || s == t'
                       || not (Set.member s (accessible (frame m) t)
                            && Set.member t' (accessible (frame m) s))
-                      || satisfies m s c)
+                      || satisfies m s b)
                   (worlds (frame m)))
       (accessible (frame m) t)
 

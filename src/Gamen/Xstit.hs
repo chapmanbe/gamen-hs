@@ -187,6 +187,8 @@ xSatisfies m w (Knowledge agent f) =
 
 -- Ought_a phi: obligation via violation constants (Definition 5.1)
 -- O[a xstit]phi = Settled(Not([a xstit]phi) -> [a xstit]V_a)
+-- Note: obligation produces Settled/Stit/Not/Implies — no Ought,
+-- so the recursion through xSatisfies terminates.
 xSatisfies m w (Ought agent f) =
   xSatisfies m w (obligation agent f)
 

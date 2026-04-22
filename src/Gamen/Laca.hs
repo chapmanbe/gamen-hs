@@ -77,12 +77,12 @@ succState s attempts = Map.mapWithKey (\atom val ->
 -- a fixed attempt set repeatedly. Returns states up to a cycle or
 -- the given maximum length.
 trajectory :: LacaState -> Set String -> Int -> [LacaState]
-trajectory s0 attempts maxLen = go s0 maxLen []
+trajectory s0 attempts maxLen = go s0 maxLen Set.empty []
   where
-    go _ 0 acc = reverse acc
-    go s n acc
-      | s `elem` acc = reverse (s : acc)  -- cycle detected
-      | otherwise = go (succState s attempts) (n - 1) (s : acc)
+    go _ 0 _ acc = reverse acc
+    go s n seen acc
+      | Set.member s seen = reverse (s : acc)  -- cycle detected (O(log n) lookup)
+      | otherwise = go (succState s attempts) (n - 1) (Set.insert s seen) (s : acc)
 
 -- --------------------------------------------------------------------
 -- Semantics (Section 3.2, Herzig et al. 2022)

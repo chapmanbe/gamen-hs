@@ -658,8 +658,18 @@ tryPriority1Pass sys branch =
                               else branchExpanded branch
               in if left == branch && right == branch
                  then go (i + 1) pfs n  -- all already present
-                 else if left == branch || right == branch
-                 then go (i + 1) pfs n  -- one arm is parent (skip)
+                 else if left == branch
+                 -- Left arm is parent (already on branch). Keep parent
+                 -- as-is plus the new right arm. Mark formula expanded
+                 -- to avoid re-triggering this split.
+                 then let parent = branch { branchExpanded = IntSet.insert i (branchExpanded branch) }
+                      in Just [ parent
+                              , right { scanStart = i, branchExpanded = expanded' } ]
+                 else if right == branch
+                 -- Right arm is parent. Symmetric case.
+                 then let parent = branch { branchExpanded = IntSet.insert i (branchExpanded branch) }
+                      in Just [ left  { scanStart = i, branchExpanded = expanded' }
+                              , parent ]
                  else Just [ left  { scanStart = i, branchExpanded = expanded' }
                            , right { scanStart = i, branchExpanded = expanded' } ]
 
@@ -792,30 +802,35 @@ isTableauClosed (Tableau bs) = all isClosed bs
 -- @maxSteps@ bounds rule applications to prevent non-termination
 -- for non-theorems in systems without the finite model property.
 buildTableau :: System -> [PrefixedFormula] -> Int -> Tableau
-buildTableau sys assumptions maxSteps = go [mkBranch assumptions] 0
+buildTableau sys assumptions maxSteps =
+  go [mkBranch assumptions] Set.empty 0
   where
-    go branches steps
+    go branches saturated steps
       | steps >= maxSteps = Tableau branches
       | otherwise =
-        case findOpenBranch branches of
-          Nothing -> Tableau branches  -- all closed
+        case findExpandableBranch branches saturated of
+          Nothing -> Tableau branches  -- all closed or saturated
           Just (idx, branch) ->
             let newBranches = applyAllRules sys branch
             in if case newBranches of
                     [b] -> b == branch
                     _   -> False
-               then -- This branch is saturated. Check if others remain.
-                    Tableau branches
+               then -- This branch is saturated; mark it and continue
+                    -- searching other branches.
+                    go branches (Set.insert idx saturated) (steps + 1)
                else
+                 -- Saturated indices may shift after splicing, so reset.
                  let updated = take idx branches
                             ++ newBranches
                             ++ drop (idx + 1) branches
-                 in go updated (steps + 1)
+                 in go updated Set.empty (steps + 1)
 
--- | Find the first open (non-closed) branch and its index.
-findOpenBranch :: [Branch] -> Maybe (Int, Branch)
-findOpenBranch branches =
-  case [(i, b) | (i, b) <- zip [0..] branches, not (isClosed b)] of
+-- | Find the first open, non-saturated branch and its index.
+findExpandableBranch :: [Branch] -> Set Int -> Maybe (Int, Branch)
+findExpandableBranch branches saturated =
+  case [(i, b) | (i, b) <- zip [0..] branches
+               , not (isClosed b)
+               , not (Set.member i saturated)] of
     []      -> Nothing
     (ib:_)  -> Just ib
 
