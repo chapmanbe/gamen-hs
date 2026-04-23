@@ -34,12 +34,41 @@ gamen-hs provides a formal framework for reasoning about **obligation**, **agenc
 | `Gamen.DeonticStit` | DS | Deontic STIT: ought, permitted, duty/compliance/fulfillment checking (Lyon & van Berkel 2024) |
 | `Gamen.Xstit` | XSTIT | Epistemic deontic STIT: obligation via violation constants, mens rea classification (Broersen 2011) |
 
-## Quick Start
+## Installation
 
-Requires GHC 9.8+ and cabal. Install via [GHCup](https://www.haskell.org/ghcup/).
+### Prerequisites
+
+Install GHC and cabal via [GHCup](https://www.haskell.org/ghcup/) (the standard Haskell toolchain manager, similar to `rustup` or `juliaup`):
 
 ```bash
-# Build
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+```
+
+The installer is interactive. Recommended answers:
+
+- **Add to PATH**: Yes
+- **Install HLS** (Haskell Language Server): Yes if using VS Code or another editor with LSP support
+- **Install Stack**: No (this project uses cabal, not stack)
+
+Open a new terminal after installation, then verify:
+
+```bash
+ghc --version       # should show 9.8.x
+cabal --version     # should show 3.x
+```
+
+If you need GHC 9.8 specifically:
+
+```bash
+ghcup install ghc 9.8
+ghcup set ghc 9.8
+```
+
+### Build and test
+
+```bash
+git clone git@github.com:chapmanbe/gamen-hs.git
+cd gamen-hs
 cabal build
 
 # Run tests (190 tests)
