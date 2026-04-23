@@ -35,7 +35,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 
 import Gamen.Formula
-import Gamen.Kripke (World)
+import Gamen.Kripke (World, isEquivalenceOn, equivalenceClasses, checkIndependence)
 
 -- | An agent is identified by a string.
 type Agent = String
@@ -224,18 +224,7 @@ checkC2 :: StitFrame -> Bool
 checkC2 fr =
   let moments = equivalenceClasses (sWorlds fr) (rSettled fr)
       agentList = Map.keys (rAgents fr)
-  in all (\mom -> checkIndependence fr agentList mom) moments
-
--- | Check independence of agents within a single moment.
-checkIndependence :: StitFrame -> [Agent] -> Set World -> Bool
-checkIndependence _ [] _ = True
-checkIndependence fr agents mom =
-  let -- For each agent, collect the distinct choice cells within this moment
-      choiceCells agent = Set.toList $ Set.fromList
-        [agentAccessible fr agent w | w <- Set.toList mom]
-      -- Generate all combinations (Cartesian product)
-      combinations = sequence [choiceCells agent | agent <- agents]
-  in all (\cells -> not (Set.null (foldl1 Set.intersection cells))) combinations
+  in all (checkIndependence (agentAccessible fr) agentList) moments
 
 -- | C3: R_Agt(w) = intersection of R_i(w) for all i.
 -- The grand coalition's choice is the pointwise intersection of individual choices.
@@ -303,17 +292,3 @@ isValidStitFrame fr =
   checkC1 fr && checkC2 fr && checkC3 fr &&
   checkC4 fr && checkC5 fr && checkC6 fr && checkC7 fr
 
--- --------------------------------------------------------------------
--- Helpers
--- --------------------------------------------------------------------
-
--- | Compute equivalence classes from a relation.
-equivalenceClasses :: Set World -> Map World (Set World) -> [Set World]
-equivalenceClasses ws rel = go (Set.toList ws) Set.empty []
-  where
-    go [] _ acc = acc
-    go (w:rest) seen acc
-      | Set.member w seen = go rest seen acc
-      | otherwise =
-          let cls = sAccessible rel w
-          in go rest (Set.union seen cls) (cls : acc)

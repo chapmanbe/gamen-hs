@@ -661,7 +661,8 @@ tryPriority1Pass sys branch =
                  else if left == branch
                  -- Left arm is parent (already on branch). Keep parent
                  -- as-is plus the new right arm. Mark formula expanded
-                 -- to avoid re-triggering this split.
+                 -- unconditionally (even non-propositional) to avoid
+                 -- re-triggering this exact split on the parent branch.
                  then let parent = branch { branchExpanded = IntSet.insert i (branchExpanded branch) }
                       in Just [ parent
                               , right { scanStart = i, branchExpanded = expanded' } ]

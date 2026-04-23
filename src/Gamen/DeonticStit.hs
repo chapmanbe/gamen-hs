@@ -38,7 +38,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 
 import Gamen.Formula
-import Gamen.Kripke (World)
+import Gamen.Kripke (World, isEquivalenceOn, checkIndependence)
 
 -- | An agent identifier.
 type Agent = String
@@ -183,33 +183,15 @@ dsIsValid models f = all (`dsIsTrueIn` f) models
 
 -- | C1: R_[i] is an equivalence relation for all i.
 checkDS_C1 :: DSFrame -> Bool
-checkDS_C1 fr = all (\(_, rel) -> isEquiv (dsWorlds fr) rel)
+checkDS_C1 fr = all (\(_, rel) -> isEquivalenceOn (dsWorlds fr) rel)
   (Map.toList (dsRelations fr))
-  where
-    isEquiv ws rel =
-      -- Reflexive
-      all (\w -> Set.member w (Map.findWithDefault Set.empty w rel)) ws
-      &&
-      -- Symmetric
-      all (\w -> all (\v -> Set.member w (Map.findWithDefault Set.empty v rel))
-                   (Map.findWithDefault Set.empty w rel)) ws
-      &&
-      -- Transitive
-      all (\w -> all (\v -> Map.findWithDefault Set.empty v rel
-                            `Set.isSubsetOf` Map.findWithDefault Set.empty w rel)
-                   (Map.findWithDefault Set.empty w rel)) ws
 
 -- | C2: Independence of agents.
 -- For any selection of one choice cell per agent, the intersection is non-empty.
 checkDS_C2 :: DSFrame -> Bool
 checkDS_C2 fr =
   let agentList = Map.keys (dsRelations fr)
-      -- Collect distinct choice cells per agent
-      choiceCells agent = Set.toList $ Set.fromList
-        [dsAccessible fr agent w | w <- Set.toList (dsWorlds fr)]
-      -- Cartesian product of all agents' choice cell families
-      combinations = sequence [choiceCells agent | agent <- agentList]
-  in all (\cells -> not (Set.null (foldl1 Set.intersection cells))) combinations
+  in checkIndependence (dsAccessible fr) agentList (dsWorlds fr)
 
 -- | C3: Limited choice — each agent has at most k choice cells.
 -- k=0 means unlimited.

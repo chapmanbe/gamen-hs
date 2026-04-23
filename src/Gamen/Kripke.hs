@@ -6,6 +6,10 @@ module Gamen.Kripke
   , accessible
   , mkFrame
   , mkModel
+    -- * Relation utilities (shared across STIT modules)
+  , isEquivalenceOn
+  , equivalenceClasses
+  , checkIndependence
   ) where
 
 import Data.Map.Strict (Map)
@@ -61,3 +65,52 @@ mkModel fr vals = Model
   { frame     = fr
   , valuation = Map.fromList [(atom, Set.fromList ws) | (atom, ws) <- vals]
   }
+
+-- --------------------------------------------------------------------
+-- Relation utilities (shared across STIT modules)
+-- --------------------------------------------------------------------
+
+-- | Check whether a relation is an equivalence relation over a set of worlds
+-- (reflexive, symmetric, transitive).
+--
+-- Used by Stit, DeonticStit, and Xstit frame condition checkers.
+isEquivalenceOn :: Set World -> Map World (Set World) -> Bool
+isEquivalenceOn ws rel =
+  -- Reflexive
+  all (\w -> Set.member w (Map.findWithDefault Set.empty w rel)) ws
+  &&
+  -- Symmetric
+  all (\w -> all (\v -> Set.member w (Map.findWithDefault Set.empty v rel))
+               (Map.findWithDefault Set.empty w rel)) ws
+  &&
+  -- Transitive
+  all (\w -> all (\v -> Map.findWithDefault Set.empty v rel
+                        `Set.isSubsetOf` Map.findWithDefault Set.empty w rel)
+               (Map.findWithDefault Set.empty w rel)) ws
+
+-- | Compute equivalence classes from a relation.
+equivalenceClasses :: Set World -> Map World (Set World) -> [Set World]
+equivalenceClasses ws rel = go (Set.toList ws) Set.empty []
+  where
+    go [] _ acc = acc
+    go (w:rest) seen acc
+      | Set.member w seen = go rest seen acc
+      | otherwise =
+          let cls = Map.findWithDefault Set.empty w rel
+          in go rest (Set.union seen cls) (cls : acc)
+
+-- | Check independence of agents within a single moment.
+--
+-- For any selection of one choice cell per agent, the intersection
+-- must be non-empty. The first argument is a function returning an
+-- agent's choice cell at a given world.
+checkIndependence :: (agent -> World -> Set World)  -- ^ Choice cell accessor
+                  -> [agent]                        -- ^ Agents
+                  -> Set World                      -- ^ Moment (worlds to check within)
+                  -> Bool
+checkIndependence _ [] _ = True
+checkIndependence choiceCell agents mom =
+  let choiceCells agent = Set.toList $ Set.fromList
+        [choiceCell agent w | w <- Set.toList mom]
+      combinations = sequence [choiceCells agent | agent <- agents]
+  in all (\cells -> not (Set.null (foldl1 Set.intersection cells))) combinations

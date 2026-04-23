@@ -54,7 +54,7 @@ import Data.Set (Set)
 import Data.Set qualified as Set
 
 import Gamen.Formula
-import Gamen.Kripke (World)
+import Gamen.Kripke (World, isEquivalenceOn, equivalenceClasses, checkIndependence)
 
 -- | An agent identifier.
 type Agent = String
@@ -232,11 +232,11 @@ checkXC1 fr = all (\w -> Map.member w (rNext fr)) (xWorlds fr)
 
 -- | XC2: R_□ is an equivalence relation.
 checkXC2 :: XstitFrame -> Bool
-checkXC2 fr = isEquivOver (xWorlds fr) (rSettledX fr)
+checkXC2 fr = isEquivalenceOn (xWorlds fr) (rSettledX fr)
 
 -- | XC3: Each R_[A] is an equivalence relation.
 checkXC3 :: XstitFrame -> Bool
-checkXC3 fr = all (\(_, rel) -> isEquivOver (xWorlds fr) rel)
+checkXC3 fr = all (\(_, rel) -> isEquivalenceOn (xWorlds fr) rel)
   (Map.toList (rChoice fr))
 
 -- | XC4: R_[A] refines R_□ — each choice cell is within a single moment.
@@ -256,11 +256,11 @@ checkXC5 :: XstitFrame -> Bool
 checkXC5 fr =
   let agentList = Map.keys (rChoice fr)
       moments = equivalenceClasses (xWorlds fr) (rSettledX fr)
-  in all (\mom -> checkIndependence fr agentList mom) moments
+  in all (checkIndependence (xChoiceCell fr) agentList) moments
 
 -- | XC6: Each R_{K_a} is an equivalence relation.
 checkXC6 :: XstitFrame -> Bool
-checkXC6 fr = all (\(_, rel) -> isEquivOver (xWorlds fr) rel)
+checkXC6 fr = all (\(_, rel) -> isEquivalenceOn (xWorlds fr) rel)
   (Map.toList (rEpistemic fr))
 
 -- | Check all XSTIT frame conditions.
@@ -365,37 +365,3 @@ xEpistemicDutyCheck m w agent candidates =
 -- Helpers
 -- --------------------------------------------------------------------
 
--- | Check whether a relation is an equivalence relation over a set of worlds.
-isEquivOver :: Set World -> Map World (Set World) -> Bool
-isEquivOver ws rel =
-  -- Reflexive
-  all (\w -> Set.member w (Map.findWithDefault Set.empty w rel)) ws
-  &&
-  -- Symmetric
-  all (\w -> all (\v -> Set.member w (Map.findWithDefault Set.empty v rel))
-               (Map.findWithDefault Set.empty w rel)) ws
-  &&
-  -- Transitive
-  all (\w -> all (\v -> Map.findWithDefault Set.empty v rel
-                        `Set.isSubsetOf` Map.findWithDefault Set.empty w rel)
-               (Map.findWithDefault Set.empty w rel)) ws
-
--- | Compute equivalence classes from a relation.
-equivalenceClasses :: Set World -> Map World (Set World) -> [Set World]
-equivalenceClasses ws rel = go (Set.toList ws) Set.empty []
-  where
-    go [] _ acc = acc
-    go (w:rest) seen acc
-      | Set.member w seen = go rest seen acc
-      | otherwise =
-          let cls = Map.findWithDefault Set.empty w rel
-          in go rest (Set.union seen cls) (cls : acc)
-
--- | Check independence of agents within a single moment.
-checkIndependence :: XstitFrame -> [Agent] -> Set World -> Bool
-checkIndependence _ [] _ = True
-checkIndependence fr agents mom =
-  let choiceCells agent = Set.toList $ Set.fromList
-        [xChoiceCell fr agent w | w <- Set.toList mom]
-      combinations = sequence [choiceCells agent | agent <- agents]
-  in all (\cells -> not (Set.null (foldl1 Set.intersection cells))) combinations
