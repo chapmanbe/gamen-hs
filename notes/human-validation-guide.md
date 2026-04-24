@@ -1,5 +1,10 @@
 # Human Validation Guide for gamen-hs
 
+> **Sister project**: The Julia counterpart lives at
+> `~/Code/Julia/Gamen.jl/notes/human-validation-guide.md`. The two guides share
+> a structure; each is adapted to its language's tooling and the modules
+> specific to that repo.
+
 ## Why human validation matters
 
 The code has three layers of validation, each catching different kinds of errors:
@@ -94,7 +99,7 @@ tableauConsistent systemKT [Box p, Diamond (Not p)]   -- False (unsatisfiable in
 
 ## 5. Cross-validate against Gamen.jl
 
-For the modules that exist in both projects (basic modal logic, Kripke semantics, frame properties, tableau), build the same model in both and compare results:
+For the modules that exist in both projects (basic modal logic, Kripke semantics, frame properties, tableau), build the same model in both and compare results. See Gamen.jl's own validation guide at `~/Code/Julia/Gamen.jl/notes/human-validation-guide.md` for the Julia-side workflow.
 
 ```julia
 # In Julia (Gamen.jl)
