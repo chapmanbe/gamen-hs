@@ -4,7 +4,7 @@
 --
 -- Reads JSON requests from stdin, dispatches to gamen-hs logic functions,
 -- writes JSON responses to stdout. Designed to be called from Python as
--- a persistent subprocess (Option B architecture).
+-- a persistent subprocess.
 --
 -- Protocol: one JSON object per line (JSON Lines).
 --
@@ -12,11 +12,23 @@
 --   {"action": "check_consistency", "formulas": [...]}
 --   {"action": "validate_formula", "formula": {...}}
 --   {"action": "validate_agent", "formula": {...}, "agent": "clinician"}
+--   {"action": "check_pairwise", "formulas": [...]}
 --   {"action": "ping"}
 --
 -- Response format:
 --   {"ok": true, "result": ...}
 --   {"ok": false, "error": "description"}
+--
+-- Formula JSON formats (both accepted):
+--
+--   Tree format (round-trips with ToJSON, supports all 24 constructors):
+--     {"type": "box", "operand": {"type": "implies",
+--       "left": {"type": "atom", "name": "p"},
+--       "right": {"type": "atom", "name": "q"}}}
+--
+--   Flat extraction format (compact, for LLM-extracted recommendations):
+--     {"op": "box", "atom": "statin", "agent": "clinician",
+--      "conditional": "ascvd", "temporal_op": "future_box"}
 module Main where
 
 import Data.Aeson

@@ -90,6 +90,12 @@ Prefixed signed tableaux with:
 - **Broersen (2011)**: XSTIT epistemic deontic — mens rea categories (Phase 4)
 - **Gamen.jl source**: `~/Code/Julia/Gamen.jl/src/` — original reference implementation
 
+## Executables
+
+- `gamen-repl` — quick demo (Figure 1.1 from B&D)
+- `gamen-validate` — JSON Lines stdin/stdout service for cross-language validation. Accepts formulas in tree format (round-trips with all 24 constructors) or flat extraction format (for LLM output). Protocol documented in `validate/Main.hs`.
+- `example-tableau`, `example-deontic-stit`, `example-mens-rea` — runnable examples
+
 ## Documentation
 
 - `whitepaper/gamen-hs-whitepaper-v2.md` — full whitepaper with health sciences applications

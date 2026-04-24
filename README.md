@@ -121,6 +121,29 @@ dutyCheck m "w1" "jade" [Atom "left_jade", Atom "left_kai"]
 -- [left_jade]
 ```
 
+## JSON Lines Validation Service
+
+`gamen-validate` is a JSON Lines service that exposes the tableau prover and formula handling to external programs (Python, Julia, etc.) via stdin/stdout.
+
+```bash
+# Build the service
+cabal build gamen-validate
+
+# Check consistency of two formulas
+echo '{"action": "check_consistency", "formulas": [
+  {"type": "box", "operand": {"type": "atom", "name": "q"}},
+  {"type": "box", "operand": {"type": "not", "operand": {"type": "atom", "name": "q"}}}
+]}' | cabal run gamen-validate
+# → {"ok":true,"result":{"consistent":false,"formula_count":2}}
+```
+
+Formulas can be submitted in two JSON formats:
+
+- **Tree format**: recursive structure matching the Formula ADT (`"type"` key). Supports all 24 constructors, including compound formulas like `□(p → q)`.
+- **Flat extraction format**: compact `"op"`/`"atom"` format designed for LLM-extracted recommendations.
+
+See `validate/Main.hs` for the full protocol specification.
+
 ## Architecture
 
 **Single Formula type**: One algebraic data type with 24 constructors. Adding a constructor requires updating every pattern-matching function -- GHC's exhaustiveness checker enforces this at compile time.
