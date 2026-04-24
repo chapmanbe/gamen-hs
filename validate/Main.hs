@@ -20,7 +20,7 @@
 module Main where
 
 import Data.Aeson
-import Data.Aeson.Types (Parser)
+import Data.Aeson.Types (Object, Parser)
 import Data.ByteString.Lazy qualified as BL
 import Data.ByteString.Lazy.Char8 qualified as BLC
 import Data.Map.Strict qualified as Map
@@ -37,13 +37,65 @@ import Gamen.Tableau (tableauConsistent, tableauProves, System, systemKD)
 -- Formula JSON decoding
 -- ═══════════════════════════════════════════════════════════════════
 
--- | Decode a formula from the Python extraction JSON format.
+-- | Decode a formula from JSON.
 --
--- Input format (from extract.py):
---   {"op": "box", "atom": "statin", "conditional": "ascvd_age_40_75",
---    "temporal_op": "future_box", "agent": "clinician"}
+-- Accepts two formats:
 --
--- Mapping to Formula constructors:
+-- 1. __Tree format__ (round-trips with 'ToJSON'): recursive structure
+--    matching the Formula ADT. Uses @"type"@ to identify the constructor.
+--
+--    > {"type": "box", "operand": {"type": "implies", "left": ..., "right": ...}}
+--    > {"type": "atom", "name": "p"}
+--    > {"type": "ought", "agent": "c", "operand": {...}}
+--
+-- 2. __Flat extraction format__ (from Python @extract.py@): compact format
+--    for LLM-extracted recommendations.
+--
+--    > {"op": "box", "atom": "statin", "conditional": "ascvd_age_40_75",
+--    >  "temporal_op": "future_box", "agent": "clinician"}
+--
+-- Dispatch: if the object has a @"type"@ key, parse as tree format;
+-- if it has an @"op"@ key, parse as flat extraction format.
+instance FromJSON Formula where
+  parseJSON = withObject "Formula" $ \o -> do
+    mType <- o .:? "type" :: Parser (Maybe Text)
+    mOp   <- o .:? "op"   :: Parser (Maybe Text)
+    case (mType, mOp) of
+      (Just typ, _) -> parseTreeFormat o typ
+      (_, Just op)  -> parseFlatFormat o op
+      _             -> fail "Formula JSON must have either 'type' (tree format) or 'op' (extraction format)"
+
+-- | Parse the tree format (matches ToJSON output).
+parseTreeFormat :: Object -> Text -> Parser Formula
+parseTreeFormat o typ = case typ of
+  "bot"             -> pure Bot
+  "atom"            -> Atom . T.unpack <$> o .: "name"
+  "not"             -> Not <$> o .: "operand"
+  "and"             -> And <$> o .: "left" <*> o .: "right"
+  "or"              -> Or <$> o .: "left" <*> o .: "right"
+  "implies"         -> Implies <$> o .: "left" <*> o .: "right"
+  "iff"             -> Iff <$> o .: "left" <*> o .: "right"
+  "box"             -> Box <$> o .: "operand"
+  "diamond"         -> Diamond <$> o .: "operand"
+  "future_box"      -> FutureBox <$> o .: "operand"
+  "future_diamond"  -> FutureDiamond <$> o .: "operand"
+  "past_box"        -> PastBox <$> o .: "operand"
+  "past_diamond"    -> PastDiamond <$> o .: "operand"
+  "since"           -> Since <$> o .: "left" <*> o .: "right"
+  "until"           -> Until <$> o .: "left" <*> o .: "right"
+  "knowledge"       -> Knowledge . T.unpack <$> o .: "agent" <*> o .: "operand"
+  "announce"        -> Announce <$> o .: "left" <*> o .: "right"
+  "stit"            -> Stit . T.unpack <$> o .: "agent" <*> o .: "operand"
+  "group_stit"      -> GroupStit <$> o .: "operand"
+  "settled"         -> Settled <$> o .: "operand"
+  "next"            -> Next <$> o .: "operand"
+  "ought"           -> Ought . T.unpack <$> o .: "agent" <*> o .: "operand"
+  "permitted"       -> Permitted . T.unpack <$> o .: "agent" <*> o .: "operand"
+  _                 -> fail $ "Unknown formula type: " ++ T.unpack typ
+
+-- | Parse the flat extraction format (from Python LLM extraction).
+--
+-- Mapping:
 --   op="box"     + agent → Ought agent (core)
 --   op="box"     no agent → Box (core)
 --   op="diamond" + agent → Permitted agent (core)
@@ -53,9 +105,8 @@ import Gamen.Tableau (tableauConsistent, tableauProves, System, systemKD)
 --
 -- Where core = Atom atom, optionally wrapped in temporal operators
 -- and conditional implications.
-instance FromJSON Formula where
-  parseJSON = withObject "Formula" $ \o -> do
-    op    <- o .: "op"     :: Parser Text
+parseFlatFormat :: Object -> Text -> Parser Formula
+parseFlatFormat o op = do
     atom  <- o .: "atom"   :: Parser Text
     mCond <- o .:? "conditional" :: Parser (Maybe Text)
     mTemp <- o .:? "temporal_op" :: Parser (Maybe Text)
