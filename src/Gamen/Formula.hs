@@ -13,7 +13,7 @@ module Gamen.Formula
              Box, Diamond,
              FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until,
              Knowledge, Belief, Announce,
-             Stit, GroupStit, Settled, Next,
+             Stit, ChoiceDiamond, GroupStit, Next,
              Ought, Permitted,
              AtomF)
   , pattern Atom
@@ -63,9 +63,9 @@ data Formula
   | Knowledge String Formula  -- ^ K_a A (agent a knows A; factive)
   | Belief String Formula     -- ^ B_a A (agent a believes A; non-factive, KD45)
   | Announce Formula Formula  -- ^ [B]C (public announcement)
-  | Stit String Formula       -- ^ [i]A (agent i sees to it that A)
-  | GroupStit Formula          -- ^ [Agt]A (grand coalition stit)
-  | Settled Formula            -- ^ □_s A (historical necessity / settledness)
+  | Stit String Formula        -- ^ [i]A (agent i sees to it that A)
+  | ChoiceDiamond String Formula -- ^ ⟨i⟩A (i has a choice that allows A)
+  | GroupStit Formula          -- ^ [Agt]A (grand coalition stit; T-STIT only)
   | Next Formula               -- ^ XA (next state, LACA)
   | Ought String Formula       -- ^ ⊗_i A (agent i ought to see to it that A)
   | Permitted String Formula   -- ^ ⊖_i A (agent i is permitted to see to it that A)
@@ -83,7 +83,7 @@ pattern Atom n <- AtomF (MkAtom n)
              Box, Diamond,
              FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until,
              Knowledge, Belief, Announce,
-             Stit, GroupStit, Settled, Next,
+             Stit, ChoiceDiamond, GroupStit, Next,
              Ought, Permitted #-}
 
 -- | ⊤ abbreviates ¬⊥ (Definition 1.3, item 1).
@@ -125,8 +125,9 @@ instance Show Formula where
     . showString "]" . showsPrec 10 c
   showsPrec _ (Stit a f)    = showString "[" . showString a
     . showString "]" . showsPrec 10 f
+  showsPrec _ (ChoiceDiamond a f) = showString "<" . showString a
+    . showString ">" . showsPrec 10 f
   showsPrec _ (GroupStit f)  = showString "[Agt]" . showsPrec 10 f
-  showsPrec _ (Settled f)    = showString "Settled " . showsPrec 10 f
   showsPrec _ (Next f)       = showString "X" . showsPrec 10 f
   showsPrec _ (Ought a f)    = showString "O[" . showString a
     . showString "]" . showsPrec 10 f
@@ -158,8 +159,8 @@ isModalFree (Knowledge _ _)   = False
 isModalFree (Belief _ _)      = False
 isModalFree (Announce _ _)    = False
 isModalFree (Stit _ _)        = False
+isModalFree (ChoiceDiamond _ _) = False
 isModalFree (GroupStit _)     = False
-isModalFree (Settled _)       = False
 isModalFree (Next _)          = False
 isModalFree (Ought _ _)       = False
 isModalFree (Permitted _ _)   = False
@@ -189,24 +190,27 @@ atoms (Knowledge _ f)   = atoms f
 atoms (Belief _ f)      = atoms f
 atoms (Announce b c)    = atoms b `Set.union` atoms c
 atoms (Stit _ f)        = atoms f
+atoms (ChoiceDiamond _ f) = atoms f
 atoms (GroupStit f)     = atoms f
-atoms (Settled f)       = atoms f
 atoms (Next f)          = atoms f
 atoms (Ought _ f)       = atoms f
 atoms (Permitted _ f)   = atoms f
 
 -- | Deliberative stit: agent i deliberately sees to it that A.
--- [i dstit]A = [i]A /\ ~Settled(A) (Lorini 2013).
+-- [i dstit]A = [i]A /\ ~□A (Lorini 2013).
+-- Settledness is represented by 'Box' in our language (no separate
+-- 'Settled' constructor); the relational interpretation depends on
+-- the model: 'Gamen.Stit' interprets 'Box' over R_□.
 dstit :: String -> Formula -> Formula
-dstit agent phi = And (Stit agent phi) (Not (Settled phi))
+dstit agent phi = And (Stit agent phi) (Not (Box phi))
 
 -- | Social commitment: agent i is committed to agent j to ensure A.
--- C_{i:j}A = Settled(~F*[i]A -> G*v_{i,j}) /\ ~[i]A
+-- C_{i:j}A = □(~F*[i]A -> G*v_{i,j}) /\ ~[i]A
 -- where F*p = p \/ Fp, G*p = p /\ Gp (Lorini 2013, Section 3).
 commitment :: String -> String -> Formula -> Formula
 commitment i j phi =
   let fStar p = Or p (FutureDiamond p)
       gStar p = And p (FutureBox p)
       viol = Atom ("v_" ++ i ++ "_" ++ j)
-  in And (Settled (Implies (Not (fStar (Stit i phi))) (gStar viol)))
+  in And (Box (Implies (Not (fStar (Stit i phi))) (gStar viol)))
          (Not (Stit i phi))

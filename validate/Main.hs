@@ -105,8 +105,8 @@ parseTreeFormat o typ = case typ of
   "belief"          -> Belief . T.unpack <$> o .: "agent" <*> o .: "operand"
   "announce"        -> Announce <$> o .: "left" <*> o .: "right"
   "stit"            -> Stit . T.unpack <$> o .: "agent" <*> o .: "operand"
+  "choice_diamond"  -> ChoiceDiamond . T.unpack <$> o .: "agent" <*> o .: "operand"
   "group_stit"      -> GroupStit <$> o .: "operand"
-  "settled"         -> Settled <$> o .: "operand"
   "next"            -> Next <$> o .: "operand"
   "ought"           -> Ought . T.unpack <$> o .: "agent" <*> o .: "operand"
   "permitted"       -> Permitted . T.unpack <$> o .: "agent" <*> o .: "operand"
@@ -180,8 +180,8 @@ instance ToJSON Formula where
   toJSON (Belief a f)    = object ["type" .= ("belief" :: Text), "agent" .= a, "operand" .= f]
   toJSON (Announce b c)  = object ["type" .= ("announce" :: Text), "left" .= b, "right" .= c]
   toJSON (Stit a f)    = object ["type" .= ("stit" :: Text), "agent" .= a, "operand" .= f]
+  toJSON (ChoiceDiamond a f) = object ["type" .= ("choice_diamond" :: Text), "agent" .= a, "operand" .= f]
   toJSON (GroupStit f)  = object ["type" .= ("group_stit" :: Text), "operand" .= f]
-  toJSON (Settled f)    = object ["type" .= ("settled" :: Text), "operand" .= f]
   toJSON (Next f)       = object ["type" .= ("next" :: Text), "operand" .= f]
   toJSON (Ought a f)    = object ["type" .= ("ought" :: Text), "agent" .= a, "operand" .= f]
   toJSON (Permitted a f) = object ["type" .= ("permitted" :: Text), "agent" .= a, "operand" .= f]
@@ -331,8 +331,8 @@ normalizeForTableau :: Formula -> Formula
 normalizeForTableau (Ought _ f)     = Box (normalizeForTableau f)
 normalizeForTableau (Permitted _ f) = Diamond (normalizeForTableau f)
 normalizeForTableau (Stit _ f)      = Box (normalizeForTableau f)
+normalizeForTableau (ChoiceDiamond _ f) = Diamond (normalizeForTableau f)
 normalizeForTableau (GroupStit f)    = Box (normalizeForTableau f)
-normalizeForTableau (Settled f)      = Box (normalizeForTableau f)
 normalizeForTableau (Not f)          = Not (normalizeForTableau f)
 normalizeForTableau (And l r)        = And (normalizeForTableau l) (normalizeForTableau r)
 normalizeForTableau (Or l r)         = Or (normalizeForTableau l) (normalizeForTableau r)

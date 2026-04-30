@@ -178,9 +178,13 @@ xSatisfies m w (Iff l r)     = xSatisfies m w l == xSatisfies m w r
 xSatisfies m w (Next f) =
   xSatisfies m (nextOf (xFrame m) w) f
 
--- Settled phi: phi holds at all R_□-accessible worlds (historical necessity)
-xSatisfies m w (Settled f) =
+-- □phi: phi holds at all R_□-accessible worlds (historical necessity / settled)
+xSatisfies m w (Box f) =
   all (\w' -> xSatisfies m w' f) (xSettledCell (xFrame m) w)
+
+-- ◇phi: phi holds at some R_□-accessible world (dual of □)
+xSatisfies m w (Diamond f) =
+  any (\w' -> xSatisfies m w' f) (xSettledCell (xFrame m) w)
 
 -- [a xstit] phi: agent a's choice guarantees phi at next state
 -- For all w' in R_[A](w), M, R_X(w'), |= phi
@@ -193,8 +197,8 @@ xSatisfies m w (Knowledge agent f) =
   all (\w' -> xSatisfies m w' f) (xEpistemicCell (xFrame m) agent w)
 
 -- Ought_a phi: obligation via violation constants (Definition 5.1)
--- O[a xstit]phi = Settled(Not([a xstit]phi) -> [a xstit]V_a)
--- Note: obligation produces Settled/Stit/Not/Implies — no Ought,
+-- O[a xstit]phi = □(Not([a xstit]phi) -> [a xstit]V_a)
+-- Note: obligation produces Box/Stit/Not/Implies — no Ought,
 -- so the recursion through xSatisfies terminates.
 xSatisfies m w (Ought agent f) =
   xSatisfies m w (obligation agent f)
@@ -204,10 +208,6 @@ xSatisfies m w (Permitted agent f) =
   not (xSatisfies m w (Ought agent (Not f)))
 
 -- Operators not supported in XSTIT models
-xSatisfies _ _ (Box _) =
-  error "Box not supported in XSTIT; use Settled for historical necessity"
-xSatisfies _ _ (Diamond _) =
-  error "Diamond not supported in XSTIT; use Not (Settled (Not _))"
 xSatisfies _ _ (FutureBox _) =
   error "FutureBox not supported in XSTIT; only Next is available"
 xSatisfies _ _ (FutureDiamond _) =
@@ -226,6 +226,8 @@ xSatisfies _ _ (Announce _ _) =
   error "Announce not supported in XSTIT"
 xSatisfies _ _ (GroupStit _) =
   error "GroupStit not supported in XSTIT; use Stit for individual agents"
+xSatisfies _ _ (ChoiceDiamond _ _) =
+  error "ChoiceDiamond not yet supported in XSTIT"
 
 -- | A formula is true in an XSTIT model if it holds at every world.
 xIsTrueIn :: XstitModel -> Formula -> Bool
@@ -287,10 +289,10 @@ violationAtom :: Agent -> Formula
 violationAtom a = Atom ("v_" ++ a)
 
 -- | Obligation: O[a xstit]phi (Definition 5.1).
--- Settled(Not([a xstit]phi) -> [a xstit]V_a)
+-- □(Not([a xstit]phi) -> [a xstit]V_a)
 obligation :: Agent -> Formula -> Formula
 obligation a phi =
-  Settled (Implies (Not (Stit a phi)) (Stit a (violationAtom a)))
+  Box (Implies (Not (Stit a phi)) (Stit a (violationAtom a)))
 
 -- | Knowingly doing: agent knows they see to it (Definition 5.2).
 -- K_a [a xstit] phi

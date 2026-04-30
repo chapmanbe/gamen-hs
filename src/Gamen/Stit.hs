@@ -174,13 +174,21 @@ sSatisfies m w (Iff l r)     = sSatisfies m w l == sSatisfies m w r
 sSatisfies m w (Stit agent f) =
   all (\w' -> sSatisfies m w' f) (agentAccessible (sFrame m) agent w)
 
+-- <i>phi: agent i has a choice that allows phi (existential dual of [i])
+sSatisfies m w (ChoiceDiamond agent f) =
+  any (\w' -> sSatisfies m w' f) (agentAccessible (sFrame m) agent w)
+
 -- [Agt]phi: grand coalition sees to it (universal over R_Agt)
 sSatisfies m w (GroupStit f) =
   all (\w' -> sSatisfies m w' f) (sAccessible (rGrandCoal (sFrame m)) w)
 
--- Settled phi: historically necessary (universal over R_□)
-sSatisfies m w (Settled f) =
+-- □phi: historically necessary / settled (universal over R_□)
+sSatisfies m w (Box f) =
   all (\w' -> sSatisfies m w' f) (sAccessible (rSettled (sFrame m)) w)
+
+-- ◇phi: historically possible (existential dual of □)
+sSatisfies m w (Diamond f) =
+  any (\w' -> sSatisfies m w' f) (sAccessible (rSettled (sFrame m)) w)
 
 -- Temporal operators (over R_G and R_H)
 sSatisfies m w (FutureBox f) =
@@ -193,10 +201,6 @@ sSatisfies m w (PastDiamond f) =
   any (\w' -> sSatisfies m w' f) (sAccessible (rPast (sFrame m)) w)
 
 -- Operators not supported in STIT models
-sSatisfies _ _ (Box _) =
-  error "Box not supported in STIT models; use Settled for historical necessity"
-sSatisfies _ _ (Diamond _) =
-  error "Diamond not supported in STIT models; use Not (Settled (Not _))"
 sSatisfies _ _ (Since _ _)     = error "Since not yet supported in STIT models"
 sSatisfies _ _ (Until _ _)     = error "Until not yet supported in STIT models"
 sSatisfies _ _ (Knowledge _ _) = error "Knowledge not supported in STIT models; use Gamen.Epistemic"

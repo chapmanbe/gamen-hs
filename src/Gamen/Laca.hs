@@ -96,7 +96,7 @@ trajectory s0 attempts maxLen = go s0 maxLen Set.empty []
 -- - V, n |= G phi     iff V, m |= phi for all m >= n  (always future)
 -- - V, n |= [J cstit] phi  iff for all alternative attempt profiles
 --   by agents NOT in J, phi holds at the next state
--- - V, n |= [J dstit] phi  iff [J cstit]phi and not Settled(phi)
+-- - V, n |= [J dstit] phi  iff [J cstit]phi and not □phi
 --
 -- For simplicity, we evaluate at the given state directly (n=0) and
 -- use the successor function to handle X and G. The Chellas stit
@@ -168,16 +168,21 @@ lSatisfies m s atts (Stit agent f) =
 lSatisfies m s atts (GroupStit f) =
   lSatisfies m s atts f
 
--- Settled phi: historically necessary — phi holds regardless of
+-- □phi: historically necessary / settled — phi holds regardless of
 -- ANY agent's attempts. Quantify over all possible attempt sets.
-lSatisfies m s _ (Settled f) =
+lSatisfies m s _ (Box f) =
   let allAtoms = Set.toList (lacaAtoms m)
       allSubsets = powerSet allAtoms
   in all (\atts' -> lSatisfies m s atts' f) allSubsets
 
+-- ◇phi: dual of □ — phi holds for some attempt set
+lSatisfies m s _ (Diamond f) =
+  let allAtoms = Set.toList (lacaAtoms m)
+      allSubsets = powerSet allAtoms
+  in any (\atts' -> lSatisfies m s atts' f) allSubsets
+
 -- Operators not supported in LACA
-lSatisfies _ _ _ (Box _) = error "Box not supported in LACA; use Settled"
-lSatisfies _ _ _ (Diamond _) = error "Diamond not supported in LACA"
+lSatisfies _ _ _ (ChoiceDiamond _ _) = error "ChoiceDiamond not yet supported in LACA"
 lSatisfies _ _ _ (PastBox _) = error "PastBox not supported in LACA"
 lSatisfies _ _ _ (PastDiamond _) = error "PastDiamond not supported in LACA"
 lSatisfies _ _ _ (Since _ _) = error "Since not supported in LACA"

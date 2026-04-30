@@ -118,10 +118,10 @@ satisfies _ _ (Announce _ _) =
   error "Announce operator requires an EpistemicModel (use Gamen.Epistemic)"
 satisfies _ _ (Stit _ _) =
   error "Stit operator requires a StitModel (use Gamen.Stit)"
+satisfies _ _ (ChoiceDiamond _ _) =
+  error "ChoiceDiamond operator requires a StitModel or DSModel (use Gamen.Stit or Gamen.DeonticStit)"
 satisfies _ _ (GroupStit _) =
   error "GroupStit operator requires a StitModel (use Gamen.Stit)"
-satisfies _ _ (Settled _) =
-  error "Settled operator requires a StitModel (use Gamen.Stit)"
 satisfies _ _ (Next _) =
   error "Next operator requires a LacaModel (use Gamen.Laca)"
 satisfies _ _ (Ought _ _) =

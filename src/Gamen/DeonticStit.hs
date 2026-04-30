@@ -145,14 +145,14 @@ dsSatisfies m w (Diamond f) =
 dsSatisfies m w (Stit agent f) =
   all (\u -> dsSatisfies m u f) (dsAccessible (dsFrame m) agent w)
 
--- ⟨i⟩phi: possible outcome of i's choice (Def 3, item 8)
-dsSatisfies m w (GroupStit f) =
-  -- In DS models, GroupStit is not standard; treat as settled
-  all (\u -> dsSatisfies m u f) (dsWorlds (dsFrame m))
+-- ⟨i⟩phi: i has a choice that allows phi (Def 3, item 8)
+dsSatisfies m w (ChoiceDiamond agent f) =
+  any (\u -> dsSatisfies m u f) (dsAccessible (dsFrame m) agent w)
 
--- Settled: same as Box in DS models (historical necessity = settledness)
-dsSatisfies m w (Settled f) =
-  all (\u -> dsSatisfies m u f) (dsWorlds (dsFrame m))
+-- GroupStit ([Agt]) has no analog in Lyon-Berkel's DS language;
+-- group obligation requires a different logic.
+dsSatisfies _ _ (GroupStit _) =
+  error "GroupStit not supported in DS models; Lyon-Berkel have no group operator"
 
 -- ⊗_i phi: agent i ought to see to it that phi (Def 3, item 9)
 -- True iff phi holds at all of i's ideal worlds

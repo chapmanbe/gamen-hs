@@ -38,7 +38,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (207 tests)
+- `cabal test --enable-tests` — run tests (209 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
@@ -60,8 +60,10 @@ Single closed algebraic data type. Adding a constructor requires updating every 
 - Temporal: FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until
 - Epistemic: Knowledge, Announce
 - Doxastic: Belief
-- STIT: Stit, GroupStit, Settled, Next
+- STIT: Stit, ChoiceDiamond, GroupStit, Next
 - Deontic STIT: Ought, Permitted
+
+`Settled` was removed in favour of `Box` (interpreted over `R_□` in `Gamen.Stit`/`Gamen.Xstit`/`Gamen.Laca`, and over the full world set in `Gamen.DeonticStit` per Lyon-Berkel 2024). `ChoiceDiamond` is the per-agent existential dual of `Stit` (`⟨i⟩` in Lyon-Berkel's notation).
 
 ### Model Types
 

@@ -999,22 +999,23 @@ main = hspec $ do
 
   describe "STIT formula construction" $ do
 
-    it "displays Stit, GroupStit, Settled" $ do
+    it "displays Stit, ChoiceDiamond, GroupStit" $ do
       show (Stit "i" tp) `shouldBe` "[i]p"
+      show (ChoiceDiamond "i" tp) `shouldBe` "<i>p"
       show (GroupStit tp) `shouldBe` "[Agt]p"
-      show (Settled tp) `shouldBe` "Settled p"
 
     it "STIT formulas are not modal-free" $ do
       isModalFree (Stit "i" tp) `shouldBe` False
+      isModalFree (ChoiceDiamond "i" tp) `shouldBe` False
       isModalFree (GroupStit tp) `shouldBe` False
-      isModalFree (Settled tp) `shouldBe` False
 
     it "collects atoms from STIT formulas" $ do
       atoms (Stit "i" (Implies tp tq)) `shouldBe` Set.fromList [MkAtom "p", MkAtom "q"]
+      atoms (ChoiceDiamond "i" tp) `shouldBe` Set.singleton (MkAtom "p")
       atoms (GroupStit tp) `shouldBe` Set.singleton (MkAtom "p")
 
-    it "dstit smart constructor" $ do
-      dstit "i" tp `shouldBe` And (Stit "i" tp) (Not (Settled tp))
+    it "dstit smart constructor uses Box for settledness" $ do
+      dstit "i" tp `shouldBe` And (Stit "i" tp) (Not (Box tp))
 
   -- A simple 2-moment T-STIT model:
   -- Moment m0: {w1, w2} (present), Moment m1: {w3, w4} (future)
@@ -1077,16 +1078,28 @@ main = hspec $ do
       -- [Agt]p at w2: R_Agt(w2) = {w2}, p not at w2 -> false
       sSatisfies stitModel "w2" (GroupStit tp) `shouldBe` False
 
-    it "evaluates Settled phi (historical necessity)" $ do
-      -- Settled p at w1: R_□(w1) = {w1,w2}, p at w1 but not w2 -> false
-      sSatisfies stitModel "w1" (Settled tp) `shouldBe` False
-      -- Settled (p ∨ q) at w1: p∨q true at w1 (p) and w2 (q) -> true
-      sSatisfies stitModel "w1" (Settled (Or tp tq)) `shouldBe` True
+    it "evaluates □phi (historical necessity, was Settled)" $ do
+      -- □p at w1: R_□(w1) = {w1,w2}, p at w1 but not w2 -> false
+      sSatisfies stitModel "w1" (Box tp) `shouldBe` False
+      -- □(p ∨ q) at w1: p∨q true at w1 (p) and w2 (q) -> true
+      sSatisfies stitModel "w1" (Box (Or tp tq)) `shouldBe` True
+
+    it "evaluates ◇phi (historical possibility)" $ do
+      -- ◇p at w1: R_□(w1) = {w1,w2}, p at w1 -> true
+      sSatisfies stitModel "w1" (Diamond tp) `shouldBe` True
+
+    it "evaluates <i>phi (choice diamond, dual of [i])" $ do
+      -- <a>p at w1: R_a(w1) = {w1}, p at w1 -> true
+      sSatisfies stitModel "w1" (ChoiceDiamond "a" tp) `shouldBe` True
+      -- <a>p at w2: R_a(w2) = {w2}, p not at w2 -> false
+      sSatisfies stitModel "w2" (ChoiceDiamond "a" tp) `shouldBe` False
+      -- <b>p at w1: R_b(w1) = {w1,w2}, p at w1 -> true
+      sSatisfies stitModel "w1" (ChoiceDiamond "b" tp) `shouldBe` True
 
     it "evaluates deliberative stit" $ do
-      -- dstit "a" p at w1: [a]p (true) and ~Settled(p) (true, since p not at w2)
+      -- dstit "a" p at w1: [a]p (true) and ~□p (true, since p not at w2)
       sSatisfies stitModel "w1" (dstit "a" tp) `shouldBe` True
-      -- dstit "a" (p∨q) at w1: [a](p∨q) true, Settled(p∨q) also true -> false
+      -- dstit "a" (p∨q) at w1: [a](p∨q) true, □(p∨q) also true -> false
       sSatisfies stitModel "w1" (dstit "a" (Or tp tq)) `shouldBe` False
 
     it "evaluates temporal operators (vacuous with no future)" $ do
@@ -1204,14 +1217,14 @@ main = hspec $ do
       lSatisfies lacaModel s0 atts0 (Stit "2" (Next (Atom "h")))
         `shouldBe` False
 
-    it "evaluates Settled (historical necessity)" $ do
-      -- Settled(Xh): h is true at next state regardless of ANY attempt
+    it "evaluates □ (historical necessity, was Settled)" $ do
+      -- □(Xh): h is true at next state regardless of ANY attempt
       -- combination. If nobody flips h, h stays false. -> false
-      lSatisfies lacaModel s0 atts0 (Settled (Next (Atom "h")))
+      lSatisfies lacaModel s0 atts0 (Box (Next (Atom "h")))
         `shouldBe` False
 
     it "evaluates deliberative stit" $ do
-      -- dstit "1" (Xh): [1]Xh (true with atts1) and ~Settled(Xh) (true)
+      -- dstit "1" (Xh): [1]Xh (true with atts1) and ~□(Xh) (true)
       lSatisfies lacaModel s0 atts1 (dstit "1" (Next (Atom "h")))
         `shouldBe` True
 
@@ -1426,11 +1439,11 @@ main = hspec $ do
       xSatisfies xModel' "s0_h2" (Next unsafeMed) `shouldBe` True
       xSatisfies xModel' "s0_h2" (Next safeMed) `shouldBe` False
 
-    it "evaluates Settled (historical necessity)" $ do
+    it "evaluates □ (historical necessity, was Settled)" $ do
       -- safe_med is NOT settled at s1_h1 (s1_h2 is in same moment, no safe_med)
-      xSatisfies xModel' "s1_h1" (Settled safeMed) `shouldBe` False
+      xSatisfies xModel' "s1_h1" (Box safeMed) `shouldBe` False
       -- (safe_med ∨ unsafe_med) IS settled at moment 1
-      xSatisfies xModel' "s1_h1" (Settled (Or safeMed unsafeMed)) `shouldBe` True
+      xSatisfies xModel' "s1_h1" (Box (Or safeMed unsafeMed)) `shouldBe` True
 
     it "evaluates [a xstit]phi (choice guarantees at next state)" $ do
       -- At s0_h1: clinician's choice cell = {s0_h1}.
@@ -1461,7 +1474,7 @@ main = hspec $ do
 
     it "evaluates Ought via violation constants" $ do
       -- O[c xstit]safe_med at s0_h1:
-      -- = Settled(Not([c xstit]safe_med) -> [c xstit]v_c)
+      -- = □(Not([c xstit]safe_med) -> [c xstit]v_c)
       -- At s0_h1: [c xstit]safe_med = True, so implication is vacuously true
       -- At s0_h2: [c xstit]safe_med = False, [c xstit]v_c = True (v_c at s1_h2)
       -- Both moments satisfy -> true
