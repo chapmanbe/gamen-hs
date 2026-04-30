@@ -64,6 +64,108 @@ main = hspec $ do
       case Atom "p" of
         Atom n -> n `shouldBe` "p"
 
+  -- Negation Normal Form: prerequisite for the deontic STIT prover
+  -- (issue #8 step B).
+  describe "Negation Normal Form (toNNF, isNNF)" $ do
+    let p  = Atom "p"
+        q  = Atom "q"
+        np = Not (Atom "p")
+        nq = Not (Atom "q")
+
+    it "leaves atoms and Bot unchanged" $ do
+      toNNF p   `shouldBe` p
+      toNNF Bot `shouldBe` Bot
+
+    it "preserves a literal (Not Atom)" $ do
+      toNNF np `shouldBe` np
+
+    it "eliminates double negation" $ do
+      toNNF (Not (Not p)) `shouldBe` p
+
+    it "eliminates Implies" $ do
+      toNNF (Implies p q) `shouldBe` Or np q
+
+    it "eliminates Iff" $ do
+      -- p ↔ q = (p → q) ∧ (q → p) = (¬p ∨ q) ∧ (¬q ∨ p)
+      toNNF (Iff p q) `shouldBe` And (Or np q) (Or nq p)
+
+    it "applies de Morgan over And/Or" $ do
+      toNNF (Not (And p q)) `shouldBe` Or np nq
+      toNNF (Not (Or p q))  `shouldBe` And np nq
+
+    it "negates Box/Diamond as duals" $ do
+      toNNF (Not (Box p))     `shouldBe` Diamond np
+      toNNF (Not (Diamond p)) `shouldBe` Box np
+
+    it "negates FutureBox/FutureDiamond as duals" $ do
+      toNNF (Not (FutureBox p))     `shouldBe` FutureDiamond np
+      toNNF (Not (FutureDiamond p)) `shouldBe` FutureBox np
+
+    it "negates PastBox/PastDiamond as duals" $ do
+      toNNF (Not (PastBox p))     `shouldBe` PastDiamond np
+      toNNF (Not (PastDiamond p)) `shouldBe` PastBox np
+
+    it "negates Stit and ChoiceDiamond as duals (Lyon-Berkel)" $ do
+      toNNF (Not (Stit "i" p))          `shouldBe` ChoiceDiamond "i" np
+      toNNF (Not (ChoiceDiamond "i" p)) `shouldBe` Stit "i" np
+
+    it "negates Ought and Permitted as duals (Lyon-Berkel)" $ do
+      -- ⊗_i and ⊖_i are duals via the deontic ideal set
+      -- (Lyon-Berkel 2024, Definition 3 items 9–10)
+      toNNF (Not (Ought "i" p))     `shouldBe` Permitted "i" np
+      toNNF (Not (Permitted "i" p)) `shouldBe` Ought "i" np
+
+    it "leaves negations of non-dualizable operators in place" $ do
+      -- These have no built-in dual constructor; the body is still
+      -- normalised but the outer Not stays.
+      toNNF (Not (Knowledge "a" p))       `shouldBe` Not (Knowledge "a" p)
+      toNNF (Not (Knowledge "a" (Not p))) `shouldBe` Not (Knowledge "a" np)
+      toNNF (Not (GroupStit p))           `shouldBe` Not (GroupStit p)
+      toNNF (Not (Next p))                `shouldBe` Not (Next p)
+
+    it "recurses through nested modalities" $ do
+      -- ¬□([i]p → ◇q) = □(¬([i]p → ◇q)) wait — that's wrong.
+      -- ¬□φ = ◇¬φ; ¬(l→r) = l ∧ ¬r; ¬◇r = □¬r.
+      -- So ¬□([i]p → ◇q) = ◇([i]p ∧ □¬q)
+      toNNF (Not (Box (Implies (Stit "i" p) (Diamond q))))
+        `shouldBe` Diamond (And (Stit "i" p) (Box nq))
+
+    it "isNNF accepts the L_n fragment" $ do
+      isNNF p                         `shouldBe` True
+      isNNF np                        `shouldBe` True
+      isNNF (And p np)                `shouldBe` True
+      isNNF (Or (Box p) (Diamond np)) `shouldBe` True
+      isNNF (Stit "i" (Or p np))      `shouldBe` True
+      isNNF (Ought "i" np)            `shouldBe` True
+      isNNF (ChoiceDiamond "i" p)     `shouldBe` True
+
+    it "isNNF rejects Implies, Iff, and Not on non-literal modal" $ do
+      isNNF (Implies p q)        `shouldBe` False
+      isNNF (Iff p q)            `shouldBe` False
+      isNNF (Not (And p q))      `shouldBe` False
+      isNNF (Not (Box p))        `shouldBe` False
+      isNNF (Not (Stit "i" p))   `shouldBe` False
+      isNNF (Not (Ought "i" p))  `shouldBe` False
+
+    it "toNNF produces an NNF result on L_n inputs" $ do
+      let cases =
+            [ Implies p q
+            , Iff p q
+            , Not (And p (Or q (Box (Stit "i" p))))
+            , Not (Ought "i" (Implies p q))
+            , Iff (Stit "i" p) (Box (Permitted "i" q))
+            ]
+      mapM_ (\f -> isNNF (toNNF f) `shouldBe` True) cases
+
+    it "toNNF is idempotent" $ do
+      let cases =
+            [ Implies p q
+            , Not (Iff p q)
+            , Not (Not (And (Box p) (Stit "i" (Diamond np))))
+            , Iff (Ought "i" p) (Permitted "i" (Not q))
+            ]
+      mapM_ (\f -> toNNF (toNNF f) `shouldBe` toNNF f) cases
+
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]
                   [("w1", "w2"), ("w1", "w3")]
@@ -1331,6 +1433,28 @@ main = hspec $ do
       -- i.e., no-collision states are where both cycle the same way
       let noColl = Implies (Not coll) (Or (And rj rk) (And lj lk))
       dsSatisfies dsModel' "w1" (Box noColl) `shouldBe` True
+
+  describe "toNNF preserves DS satisfaction (issue #8 step B)" $ do
+    -- Cross-check: toNNF must not change the truth value of any
+    -- formula in any DS model. Property-tested in spirit; here we
+    -- spot-check across the cycling fixture's worlds and a range of
+    -- L_n formulas that exercise every dual.
+    let phis =
+          [ Implies (Stit "j" lj) (Permitted "j" lj)         -- ought-implies-can-shaped
+          , Iff (Ought "k" lk) (Not (Permitted "k" (Not lk)))
+          , Not (And (Ought "j" lj) (Permitted "j" rj))
+          , Not (Implies (Box (Or lj rj)) (Stit "j" lj))
+          , Not (ChoiceDiamond "k" coll)
+          ]
+        worlds_ = ["w1","w2","w3","w4"]
+
+    it "every L_n test formula is satisfaction-equivalent to its NNF" $ do
+      mapM_ (\phi ->
+        mapM_ (\w ->
+          dsSatisfies dsModel' w phi
+            `shouldBe` dsSatisfies dsModel' w (toNNF phi))
+          worlds_)
+        phis
 
   describe "Normative reasoning applications (Section 5)" $ do
 

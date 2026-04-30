@@ -20,6 +20,9 @@ module Gamen.Formula
   , top
   , isModalFree
   , atoms
+    -- * Negation Normal Form
+  , toNNF
+  , isNNF
     -- * Derived STIT operators
   , dstit
   , commitment
@@ -195,6 +198,133 @@ atoms (GroupStit f)     = atoms f
 atoms (Next f)          = atoms f
 atoms (Ought _ f)       = atoms f
 atoms (Permitted _ f)   = atoms f
+
+-- ====================================================================
+-- Negation Normal Form
+-- ====================================================================
+
+-- | Rewrite a formula into Negation Normal Form (NNF).
+--
+-- In NNF, 'Implies' and 'Iff' are eliminated and 'Not' appears only on
+-- 'AtomF' (literals), on 'Bot' (the canonical \"top\" sentinel), or on
+-- modal operators that have no built-in dual constructor in this ADT
+-- ('Knowledge', 'Belief', 'Announce', 'GroupStit', 'Next', 'Since',
+-- 'Until').
+--
+-- The Lyon-Berkel L_n fragment (Bot, Atom, And, Or, Box, Diamond, Stit,
+-- ChoiceDiamond, Ought, Permitted) is closed under 'toNNF' — every
+-- formula built from L_n constructors yields a strict NNF result with
+-- 'Not' only on atoms.
+--
+-- Duals applied:
+--
+-- * @Not (Box f)@ ⇝ @Diamond (Not f)@
+-- * @Not (Diamond f)@ ⇝ @Box (Not f)@
+-- * @Not (FutureBox f)@ ⇝ @FutureDiamond (Not f)@ (and similarly for past)
+-- * @Not (Stit i f)@ ⇝ @ChoiceDiamond i (Not f)@ (and converse)
+-- * @Not (Ought i f)@ ⇝ @Permitted i (Not f)@ (and converse;
+--   ⊗_i and ⊖_i are duals via the deontic ideal set, Lyon-Berkel 2024
+--   Definition 3 items 9–10)
+-- * @Not (And l r)@ ⇝ @Or (Not l) (Not r)@ (de Morgan; converse for Or)
+-- * @Not (Not f)@ ⇝ @f@
+-- * @Implies l r@ ⇝ @Or (Not l) r@
+-- * @Iff l r@ ⇝ @And (Implies l r) (Implies r l)@ then recursed
+toNNF :: Formula -> Formula
+toNNF Bot                  = Bot
+toNNF a@(AtomF _)          = a
+toNNF (Not f)              = pushNeg f
+toNNF (And l r)            = And (toNNF l) (toNNF r)
+toNNF (Or l r)             = Or (toNNF l) (toNNF r)
+toNNF (Implies l r)        = Or (pushNeg l) (toNNF r)
+toNNF (Iff l r)            = And (toNNF (Implies l r)) (toNNF (Implies r l))
+toNNF (Box f)              = Box (toNNF f)
+toNNF (Diamond f)          = Diamond (toNNF f)
+toNNF (FutureBox f)        = FutureBox (toNNF f)
+toNNF (FutureDiamond f)    = FutureDiamond (toNNF f)
+toNNF (PastBox f)          = PastBox (toNNF f)
+toNNF (PastDiamond f)      = PastDiamond (toNNF f)
+toNNF (Since l r)          = Since (toNNF l) (toNNF r)
+toNNF (Until l r)          = Until (toNNF l) (toNNF r)
+toNNF (Knowledge a f)      = Knowledge a (toNNF f)
+toNNF (Belief a f)         = Belief a (toNNF f)
+toNNF (Announce b c)       = Announce (toNNF b) (toNNF c)
+toNNF (Stit a f)           = Stit a (toNNF f)
+toNNF (ChoiceDiamond a f)  = ChoiceDiamond a (toNNF f)
+toNNF (GroupStit f)        = GroupStit (toNNF f)
+toNNF (Next f)             = Next (toNNF f)
+toNNF (Ought a f)          = Ought a (toNNF f)
+toNNF (Permitted a f)      = Permitted a (toNNF f)
+
+-- | @pushNeg f@ returns the NNF of @Not f@ — i.e., the negation pushed
+-- in by one constructor and recursively normalised.
+pushNeg :: Formula -> Formula
+pushNeg Bot                  = Not Bot
+pushNeg a@(AtomF _)          = Not a
+pushNeg (Not f)              = toNNF f                      -- ¬¬f = f
+pushNeg (And l r)            = Or (pushNeg l) (pushNeg r)   -- de Morgan
+pushNeg (Or l r)             = And (pushNeg l) (pushNeg r)
+pushNeg (Implies l r)        = And (toNNF l) (pushNeg r)    -- ¬(l→r) = l ∧ ¬r
+pushNeg (Iff l r)            = Or (And (toNNF l) (pushNeg r))
+                                  (And (toNNF r) (pushNeg l))
+pushNeg (Box f)              = Diamond (pushNeg f)
+pushNeg (Diamond f)          = Box (pushNeg f)
+pushNeg (FutureBox f)        = FutureDiamond (pushNeg f)
+pushNeg (FutureDiamond f)    = FutureBox (pushNeg f)
+pushNeg (PastBox f)          = PastDiamond (pushNeg f)
+pushNeg (PastDiamond f)      = PastBox (pushNeg f)
+pushNeg (Stit a f)           = ChoiceDiamond a (pushNeg f)
+pushNeg (ChoiceDiamond a f)  = Stit a (pushNeg f)
+pushNeg (Ought a f)          = Permitted a (pushNeg f)
+pushNeg (Permitted a f)      = Ought a (pushNeg f)
+-- No standard duals for these; leave the negation outside but
+-- recursively normalise the body.
+pushNeg f@(Knowledge _ _)    = Not (toNNF f)
+pushNeg f@(Belief _ _)       = Not (toNNF f)
+pushNeg f@(Announce _ _)     = Not (toNNF f)
+pushNeg f@(GroupStit _)      = Not (toNNF f)
+pushNeg f@(Next _)           = Not (toNNF f)
+pushNeg f@(Since _ _)        = Not (toNNF f)
+pushNeg f@(Until _ _)        = Not (toNNF f)
+
+-- | Is the formula in Negation Normal Form? A formula is in NNF iff it
+-- contains no 'Implies', no 'Iff', and 'Not' appears only on atoms,
+-- 'Bot', or modal operators without a built-in dual.
+isNNF :: Formula -> Bool
+isNNF Bot                       = True
+isNNF (AtomF _)                 = True
+isNNF (Not Bot)                 = True
+isNNF (Not (AtomF _))           = True
+isNNF (Not (Knowledge _ f))     = isNNF f
+isNNF (Not (Belief _ f))        = isNNF f
+isNNF (Not (Announce a b))      = isNNF a && isNNF b
+isNNF (Not (GroupStit f))       = isNNF f
+isNNF (Not (Next f))            = isNNF f
+isNNF (Not (Since a b))         = isNNF a && isNNF b
+isNNF (Not (Until a b))         = isNNF a && isNNF b
+isNNF (Not _)                   = False
+isNNF (And l r)                 = isNNF l && isNNF r
+isNNF (Or l r)                  = isNNF l && isNNF r
+isNNF (Implies _ _)             = False
+isNNF (Iff _ _)                 = False
+isNNF (Box f)                   = isNNF f
+isNNF (Diamond f)               = isNNF f
+isNNF (FutureBox f)             = isNNF f
+isNNF (FutureDiamond f)         = isNNF f
+isNNF (PastBox f)               = isNNF f
+isNNF (PastDiamond f)           = isNNF f
+isNNF (Since l r)               = isNNF l && isNNF r
+isNNF (Until l r)               = isNNF l && isNNF r
+isNNF (Knowledge _ f)           = isNNF f
+isNNF (Belief _ f)              = isNNF f
+isNNF (Announce b c)            = isNNF b && isNNF c
+isNNF (Stit _ f)                = isNNF f
+isNNF (ChoiceDiamond _ f)       = isNNF f
+isNNF (GroupStit f)             = isNNF f
+isNNF (Next f)                  = isNNF f
+isNNF (Ought _ f)               = isNNF f
+isNNF (Permitted _ f)           = isNNF f
+
+-- ====================================================================
 
 -- | Deliberative stit: agent i deliberately sees to it that A.
 -- [i dstit]A = [i]A /\ ~□A (Lorini 2013).
