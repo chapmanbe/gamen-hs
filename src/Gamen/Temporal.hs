@@ -8,6 +8,10 @@ module Gamen.Temporal
   , applyTemporalTFutureDiamondRule
   , applyTemporal4FutureBoxRule
   , applyTemporal4FutureDiamondRule
+  , applyTemporalTPastBoxRule
+  , applyTemporalTPastDiamondRule
+  , applyTemporal4PastBoxRule
+  , applyTemporal4PastDiamondRule
     -- * Combined system
   , systemKDt
     -- * Temporal frame properties (Table 14.1, B&D)
@@ -66,6 +70,44 @@ applyTemporal4FutureDiamondRule (PF σ F f@(FutureDiamond _)) branch =
   in if null additions then NoRule else Stack additions
 applyTemporal4FutureDiamondRule _ _ = NoRule
 
+-- | TH rule (reflexive temporal frames): σ T HA → σ T A.
+applyTemporalTPastBoxRule :: Rule
+applyTemporalTPastBoxRule (PF σ T (PastBox a)) branch
+  | branchContains branch new = NoRule
+  | otherwise = Stack [new]
+  where new = pfTrue σ a
+applyTemporalTPastBoxRule _ _ = NoRule
+
+-- | TP rule (reflexive temporal frames): σ F PA → σ F A.
+applyTemporalTPastDiamondRule :: Rule
+applyTemporalTPastDiamondRule (PF σ F (PastDiamond a)) branch
+  | branchContains branch new = NoRule
+  | otherwise = Stack [new]
+  where new = pfFalse σ a
+applyTemporalTPastDiamondRule _ _ = NoRule
+
+-- | 4H rule (transitive temporal frames): σ T HA → τ T HA for each
+-- used parent τ of σ.
+applyTemporal4PastBoxRule :: Rule
+applyTemporal4PastBoxRule (PF σ T f@(PastBox _)) branch =
+  let used = usedPrefixes branch
+      parents = Set.filter (isChildOf σ) used
+      additions = [pfTrue τ f | τ <- Set.toList parents
+                              , not (branchContains branch (pfTrue τ f))]
+  in if null additions then NoRule else Stack additions
+applyTemporal4PastBoxRule _ _ = NoRule
+
+-- | 4P rule (transitive temporal frames): σ F PA → τ F PA for each
+-- used parent τ of σ.
+applyTemporal4PastDiamondRule :: Rule
+applyTemporal4PastDiamondRule (PF σ F f@(PastDiamond _)) branch =
+  let used = usedPrefixes branch
+      parents = Set.filter (isChildOf σ) used
+      additions = [pfFalse τ f | τ <- Set.toList parents
+                               , not (branchContains branch (pfFalse τ f))]
+  in if null additions then NoRule else Stack additions
+applyTemporal4PastDiamondRule _ _ = NoRule
+
 -- --------------------------------------------------------------------
 -- Combined deontic-temporal tableau system
 -- --------------------------------------------------------------------
@@ -79,12 +121,16 @@ applyTemporal4FutureDiamondRule _ _ = NoRule
 -- relation. Multi-relational prefixes are deferred to Phase 2.
 systemKDt :: System
 systemKDt = System "KDt"
-  [ -- Temporal reflexivity (T axiom for time): GA → A
+  [ -- Temporal reflexivity (T axiom): GA → A, HA → A
     applyTemporalTFutureBoxRule
   , applyTemporalTFutureDiamondRule
-    -- Temporal transitivity (4 axiom for time): GA → GGA
+  , applyTemporalTPastBoxRule
+  , applyTemporalTPastDiamondRule
+    -- Temporal transitivity (4 axiom): GA → GGA, HA → HHA
   , applyTemporal4FutureBoxRule
   , applyTemporal4FutureDiamondRule
+  , applyTemporal4PastBoxRule
+  , applyTemporal4PastDiamondRule
   ]
   [ -- Deontic seriality (D axiom): □A → ◇A
     -- These are the D□/D◇ rules from Tableau.hs, imported via systemKD

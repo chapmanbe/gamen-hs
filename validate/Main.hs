@@ -43,6 +43,7 @@ import System.IO (hFlush, hSetBuffering, stdout, stdin, BufferMode(..))
 
 import Gamen.Formula
 import Gamen.Tableau (tableauConsistent, tableauProves, System, systemKD)
+import Gamen.Temporal (systemKDt)
 
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -233,7 +234,7 @@ handleRequest (CheckConsistency formulas) =
   -- Normalize: strip agent-relative operators down to Box/Diamond
   -- so the KD tableau can check them. Ought a p → Box p, Permitted a p → Diamond p.
   let normalized = map normalizeForTableau formulas
-      consistent = tableauConsistent systemKD normalized
+      consistent = tableauConsistent systemKDt normalized
   in OkResult $ object
       [ "consistent" .= consistent
       , "formula_count" .= length formulas
@@ -322,6 +323,8 @@ normalizeForTableau (Box f)          = Box (normalizeForTableau f)
 normalizeForTableau (Diamond f)      = Diamond (normalizeForTableau f)
 normalizeForTableau (FutureBox f)    = FutureBox (normalizeForTableau f)
 normalizeForTableau (FutureDiamond f) = FutureDiamond (normalizeForTableau f)
+normalizeForTableau (PastBox f)      = PastBox (normalizeForTableau f)
+normalizeForTableau (PastDiamond f)  = PastDiamond (normalizeForTableau f)
 normalizeForTableau f                = f  -- Atom, Bot, etc. pass through
 
 
