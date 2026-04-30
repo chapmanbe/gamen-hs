@@ -6,6 +6,7 @@ import Data.Set qualified as Set
 
 import Data.Map.Strict qualified as Map
 import Gamen.DeonticStit
+import Gamen.DeonticStit.Sequent
 import Gamen.Epistemic
 import Gamen.Formula
 import Gamen.FrameProperties
@@ -165,6 +166,69 @@ main = hspec $ do
             , Iff (Ought "i" p) (Permitted "i" (Not q))
             ]
       mapM_ (\f -> toNNF (toNNF f) `shouldBe` toNNF f) cases
+
+  -- Sequent / label / relational-atom infrastructure for the deontic
+  -- STIT prover (issue #8 step C).
+  describe "Sequent (Gamen.DeonticStit.Sequent)" $ do
+    let p  = Atom "p"
+        q  = Atom "q"
+        w0 = label0
+        w1 = nextLabel w0
+        w2 = nextLabel w1
+
+    it "Label shows as wN" $ do
+      show w0 `shouldBe` "w0"
+      show w2 `shouldBe` "w2"
+
+    it "mkLabFormula normalises to NNF" $ do
+      lfFormula (mkLabFormula w0 (Implies p q)) `shouldBe` Or (Not p) q
+      lfFormula (mkLabFormula w0 (Not (Box p))) `shouldBe` Diamond (Not p)
+
+    it "singletonSequent seeds proof search at w₀" $ do
+      let s = singletonSequent w0 (Implies p q)
+      Set.size (gamma s) `shouldBe` 1
+      Set.null (rels s)  `shouldBe` True
+      hasFormula (mkLabFormula w0 (Implies p q)) s `shouldBe` True
+
+    it "addRel and addFormula are idempotent (set-based)" $ do
+      let r  = Choice "i" w0 w1
+          lf = mkLabFormula w0 p
+          s0 = emptySequent
+          s1 = addRel r (addRel r s0)
+          s2 = addFormula lf (addFormula lf s0)
+      Set.size (rels s1)  `shouldBe` 1
+      Set.size (gamma s2) `shouldBe` 1
+
+    it "labels collects every label appearing on either side" $ do
+      let s = addRel (Choice "i" w0 w1)
+            $ addRel (Ideal "i" w2)
+            $ singletonSequent w0 p
+      labels s `shouldBe` Set.fromList [w0, w1, w2]
+
+    it "freshLabel returns a label not in the sequent" $ do
+      let s   = addRel (Choice "i" w0 w1)
+              $ addRel (Ideal "i" w2)
+              $ singletonSequent w0 p
+          fresh = freshLabel s
+      Set.notMember fresh (labels s) `shouldBe` True
+
+    it "freshLabel on the empty sequent is w0" $ do
+      freshLabel emptySequent `shouldBe` w0
+
+    it "substLabel rewrites labels everywhere they appear" $ do
+      -- Λ(w/u) replaces u with w in both the antecedent and consequent.
+      let s        = addRel (Choice "i" w1 w2)
+                   $ addFormula (mkLabFormula w1 p)
+                   $ singletonSequent w0 q
+          renamed  = substLabel w1 w0 s
+      hasRel (Choice "i" w0 w2) renamed         `shouldBe` True
+      hasRel (Choice "i" w1 w2) renamed         `shouldBe` False
+      hasFormula (mkLabFormula w0 p) renamed    `shouldBe` True
+      hasFormula (mkLabFormula w1 p) renamed    `shouldBe` False
+
+    it "RelAtom Show matches the paper's notation shape" $ do
+      show (Choice "i" w0 w1) `shouldBe` "R_[i]w0w1"
+      show (Ideal  "i" w2)    `shouldBe` "I_⊗_i w2"
 
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]

@@ -30,7 +30,8 @@ This is a collaborative project between Brian Chapman (health informatics resear
 | `Gamen.Doxastic` | KD45 | Done | Belief operator B_a; D-axiom tableau rule |
 | `Gamen.Stit` | Lorini 2013 | Done | T-STIT model checking, constraint C1-C7 |
 | `Gamen.Laca` | Herzig et al. 2022 | Done | Finite control-and-attempt STIT |
-| `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT: ought/permitted, duty/compliance/fulfillment |
+| `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT models: ought/permitted, duty/compliance/fulfillment (model layer) |
+| `Gamen.DeonticStit.Sequent` | Lyon & van Berkel 2024 | In progress | Labeled sequent infrastructure for the G3DS^k_n prover (issue #8) |
 | `Gamen.Xstit` | Broersen 2011 | Done | Epistemic deontic XSTIT: mens rea, violation constants |
 
 ## Build System
@@ -38,7 +39,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (209 tests)
+- `cabal test --enable-tests` — run tests (236 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
