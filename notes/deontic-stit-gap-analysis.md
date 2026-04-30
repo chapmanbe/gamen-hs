@@ -169,11 +169,22 @@ Once stable, **Tier 1.5** can add `APC^k_i` for `k > 0` (a small additional rule
 
 Suggested order, each step compilable + testable on its own:
 
-### Step A — NNF + `⟨i⟩` constructor (small, mechanical)
-- Add `ChoiceDiamond String Formula` constructor to `Formula` (paper's `⟨i⟩`). Update all 25-constructor-pattern functions; GHC will tell us where (the count rises to 26).
-- Decide: keep `GroupStit` (it serves T-STIT in `Gamen.Stit`) but explicitly error out in `dsSatisfies`.
-- Add `toNNF :: Formula → Formula` in `Gamen.Formula` (push negations down to atoms; rewrite `→`, `↔`).
-- **Tests:** round-trip `toNNF . fromNNF == id` on a property-test suite.
+### Step A — Formula ADT changes (atomic, breaks compilation)
+This step rewires the language. All downstream changes depend on it; it goes in as one commit.
+
+- Add `ChoiceDiamond String Formula` constructor to `Formula` (paper's `⟨i⟩`).
+- Remove `Settled Formula` constructor. Constructor count stays at 25 (−1 +1).
+- Migrate `Gamen.Stit.sSatisfies`: the historical-necessity case now matches on `Box f` (was `Settled f`); `Box` no longer errors.
+- Rewrite derived operators `dstit` and `commitment` in `Gamen.Formula` to use `Box` instead of `Settled`.
+- Reject `GroupStit` explicitly in `Gamen.DeonticStit.dsSatisfies` (paper has no coalition operator).
+- Update `validate/Main.hs`: drop the `"settled"` tree-format JSON type; add `"choice_diamond"` for the new constructor.
+- Update `CLAUDE.md` constructor counts and module table.
+- **Tests:** existing T-STIT and DS test suites pass after the rename. New tests: a smoke test that `ChoiceDiamond` parses and round-trips through JSON.
+
+### Step B — `toNNF` transformation
+- Add `toNNF :: Formula → Formula` in `Gamen.Formula`. Push negations down to atoms; rewrite `Implies`, `Iff` in terms of `Or`, `And`, `Not`. Document the invariant that the result has `Not` only on `Atom`.
+- Add `isNNF :: Formula → Bool` for assertions.
+- **Tests:** property test using QuickCheck — `dsSatisfies m w φ ≡ dsSatisfies m w (toNNF φ)` for a generator over small DS models. `isNNF (toNNF φ) == True`. Idempotence: `toNNF (toNNF φ) == toNNF φ`.
 
 ### Step B — Sequent, label, generation-tree data types (`Gamen.DeonticStit.Sequent`)
 - `data Label = Label Int` (or `Text`).
@@ -190,11 +201,12 @@ Suggested order, each step compilable + testable on its own:
 - **Tests:** hand-build a stable sequent and confirm `isStable`; mutate it to violate each condition individually.
 
 ### Step D — Rule applications (`Gamen.DeonticStit.Rules`)
-- One function per rule from Figure 2 + Algorithm 1.
-- Non-generating rules return `Maybe Sequent` (just rewrite the sequent).
-- Generating rules return `(Label, Sequent)` (a fresh label was introduced — record it in the gen tree).
+- One function per rule from Figure 2 + Algorithm 1: `(id)`, `(∧)`, `(∨)`, `(◇)`, `(□)`, `(⟨i⟩)`, `([i])`, `(⊗_i)`, `(⊖_i)`, plus relational rules `Ref_i`, `Euc_i`, `IOA`, `APC^k_i`, `D2_i`, `D3_i`.
+- Non-generating rules return `Maybe Sequent` (rewrite the sequent in place).
+- Generating rules return `(Label, Sequent)` (record the fresh label in the gen tree).
 - `(∨)` returns `(Sequent, Sequent)` for branching.
-- **Tests:** each rule, against the worked examples in the paper (Example 5 on p. 847 deriving `⊗_i p → ◇[i]p ∨ ⊖_i ¬p`; the Yara hammer example p. 868–869).
+- `APC^k_i` parameterized by `k`; when `k = 0` the rule is omitted (and the `(C_APC)` saturation condition trivially holds).
+- **Tests:** each rule, against the worked examples in the paper (Example 5 on p. 847 deriving `⊗_i p → ◇[i]p ∨ ⊖_i ¬p`; the Yara hammer example p. 868–869). Add a small `k=2` example so the APC schema is exercised.
 
 ### Step E — Prove driver (`Gamen.DeonticStit.Prove`)
 - `prove :: Int -> Int -> Sequent -> ProveResult` mirroring Algorithm 1's three-phase loop.
@@ -218,19 +230,21 @@ Suggested order, each step compilable + testable on its own:
 ### Step H — Worked clinical test (issue #8 deliverable 6)
 - Encode AHA + KDIGO potassium scenario in the new prover. Compare the verdict to the KD-stripped path. The two should differ; whichever way the new verdict goes, document the model that explains it.
 
-## 6. Open decisions before coding
+## 6. Resolved decisions (from Jeremiah's review, 2026-04-30)
 
-These come up in Step A or B and are worth resolving before committing to a direction:
+The five questions raised in the original draft of this section have been resolved by Jeremiah Chapman's review on issue #8. Decisions, with rationale, in commit-ready form:
 
-- **NNF representation: separate type or invariant on `Formula`?** Separate type (`NNFFormula`) is clean but doubles the surface area (every test fixture needs a wrapper). Invariant on `Formula` is leaner but unenforced. Lean toward invariant + a `assertNNF` helper used at the prover boundary.
+- **NNF as a function, not a new type.** `toNNF :: Formula → Formula` lives in `Gamen.Formula`. The prover invariant ("input is in NNF") is documented at the entry point, not enforced at the type level. Rationale: every formula has an equivalent NNF, the transformation is mechanical, and a separate `NNFFormula` type would double the surface area without buying soundness.
 
-- **Add `ChoiceDiamond` or repurpose `GroupStit`?** Adding a new constructor is the honest answer (the paper's `⟨i⟩` is per-agent; `GroupStit` is unparameterized). Net cost: one more case in every pattern match. **Recommendation: add.** Don't repurpose.
+- **Add `ChoiceDiamond String Formula`** to the ADT. Don't repurpose `GroupStit`. Rationale: `⟨i⟩` and `[Agt]` are semantically distinct (per-agent vs. coalition); reusing one for the other invites bugs. Name parallels `Diamond` and `Stit`. (The name is mildly clunky, noted; if a cleaner alternative emerges during implementation we can rename — it's one constructor.)
 
-- **`Settled` in DS context.** Two options: error out in `dsSatisfies (Settled _)` (the strict reading), or silently treat it as `Box` (the lenient reading). Strict is safer. Either way, the prover module ignores `Settled` — we normalize `Settled φ` to `Box φ` in `toNNF`.
+- **Remove `Settled` entirely from the language.** Use `Box` for settledness everywhere (in `Gamen.DeonticStit` per the paper, and in `Gamen.Stit` where `Box` will now mean `R_□`). Rationale: Lyon-Berkel use `□` for settledness; the duplicate constructor was a historical artefact of the original Lorini port and never carried distinct semantics. Cross-module consequence: `Gamen.Stit.sSatisfies` switches its `Box`/`Settled` cases (currently `Box` errors out, `Settled` is the universal operator); `dstit` and `commitment` derived operators are rewritten in terms of `Box`. The validate JSON parser drops the `"settled"` tree-format type.
 
-- **Does `GroupStit` survive at all?** It is meaningful in `Gamen.Stit` (T-STIT, multi-moment) where the grand coalition is `R_Agt = ⋂ R_[i]`. Keep it there; reject it in `Gamen.DeonticStit`.
+- **`GroupStit` stays only in T-STIT.** It is meaningful in `Gamen.Stit` (R_Agt = ⋂ R_[i]). It is rejected (errors) in `Gamen.DeonticStit`. Lyon-Berkel have no group-obligation operator; capturing group obligation would require a different logic.
 
-- **Termination bound.** Lyon-Berkel prove termination, but the algorithm has no explicit bound — it's bounded by saturation. For safety in production, the wrapper should still take a `maxSteps` to bail out, even though the paper guarantees it won't be needed.
+- **Limited choice (`APC^k_i`) is IN scope for the first cut.** `k` is a prover parameter; default `k=0` (unlimited), but the rule and saturation condition are implemented from the start. Rationale (Jeremiah): real agents have a finite number of options; it's cheaper to include the rule now than to retrofit later.
+
+- **Termination bound.** The prover wrapper still takes a `maxSteps` belt-and-braces bail-out, even though Lyon-Berkel's algorithm is provably terminating once loop-checking is in place.
 
 ## 7. Out of scope (per issue #8)
 
