@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Test.Hspec
+import Control.Exception (evaluate)
 import Data.Set qualified as Set
 
 import Data.Map.Strict qualified as Map
@@ -94,6 +95,17 @@ main = hspec $ do
       -- ◇p ∧ ◇q at w1
       satisfies model11 "w1" (And (Diamond p) (Diamond q))
         `shouldBe` True
+
+    -- Regression: gamen-hs#3 / Gamen.jl#3 (Jeremiah's example).
+    -- Without the world-existence guard, satisfies returned True for
+    -- the formula (p∨q)→(¬q∧r) at a world not in the model.
+    it "errors on world not in model (gamen-hs#3)" $ do
+      let fr = mkFrame ["a","b"] [("a","a"),("a","b"),("b","b")]
+          m  = mkModel fr [("p", ["a","b"]), ("q", ["b"]), ("r", ["a"])]
+          f  = Implies (Or (Atom "p") (Atom "q")) (And (Not (Atom "q")) (Atom "r"))
+      satisfies m "a" f `shouldBe` True   -- existing world
+      satisfies m "b" f `shouldBe` False  -- existing world
+      evaluate (satisfies m "c" f) `shouldThrow` anyErrorCall
 
   describe "Truth in models (Definition 1.9)" $ do
     let p = Atom "p"

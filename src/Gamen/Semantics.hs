@@ -20,7 +20,14 @@ import Gamen.Kripke
 -- guarantees every Formula constructor is handled — try adding a new
 -- constructor to Formula and this function will get a warning until
 -- you add the case.
+--
+-- Errors if @w@ is not in @worlds (frame m)@ — without this guard,
+-- non-existent worlds yield vacuously-true results for negative,
+-- universal, and modal formulas (gamen-hs#3, mirroring Gamen.jl#3).
 satisfies :: Model -> World -> Formula -> Bool
+satisfies m w _
+  | Set.notMember w (worlds (frame m)) =
+      error $ "satisfies: world " ++ show w ++ " is not in model"
 
 -- 1. Never M, w ⊩ ⊥
 satisfies _ _ Bot = False
