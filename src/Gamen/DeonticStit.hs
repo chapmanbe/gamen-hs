@@ -165,6 +165,7 @@ dsSatisfies _ _ (PastDiamond _)   = error "PastDiamond not supported in DS model
 dsSatisfies _ _ (Since _ _)       = error "Since not supported in DS models"
 dsSatisfies _ _ (Until _ _)       = error "Until not supported in DS models"
 dsSatisfies _ _ (Knowledge _ _)   = error "Knowledge not supported in DS models"
+dsSatisfies _ _ (Belief _ _)      = error "Belief not supported in DS models"
 dsSatisfies _ _ (Announce _ _)    = error "Announce not supported in DS models"
 dsSatisfies _ _ (Next _)          = error "Next not supported in DS models"
 

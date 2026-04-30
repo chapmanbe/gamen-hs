@@ -12,6 +12,7 @@ import Gamen.Kripke
 import Gamen.Laca
 import Gamen.Semantics
 import Gamen.Stit
+import Gamen.Doxastic
 import Gamen.Tableau
 import Gamen.Temporal
 import Gamen.Xstit
@@ -847,6 +848,77 @@ main = hspec $ do
     it "K[a]p → p holds on reflexive frames" $ do
       eSatisfies m "w1" (Implies kap tp) `shouldBe` True
       eSatisfies m "w2" (Implies kap tp) `shouldBe` True
+
+  describe "Doxastic logic: Belief operator (Gamen.Doxastic, KD45)" $ do
+
+    it "displays Belief" $
+      show (Belief "a" tp) `shouldBe` "B[a]p"
+
+    it "Belief equality and modal status" $ do
+      Belief "a" tp `shouldBe` Belief "a" tp
+      Belief "a" tp `shouldNotBe` Belief "b" tp
+      Belief "a" tp `shouldNotBe` Knowledge "a" tp
+      isModalFree (Belief "a" tp) `shouldBe` False
+
+    it "atoms recurses into Belief" $
+      atoms (Belief "a" (And tp tq)) `shouldBe` Set.fromList ["p", "q"]
+
+    -- Model-checking with separate doxastic relations.
+    -- Knowledge ("a" is reflexive at w1: T axiom holds).
+    -- Belief ("a" sees w2 from w1, but NOT w1: non-factive — D axiom only).
+    let frB = mkEpistemicFrameWithBelief
+                 ["w1", "w2"]
+                 [("a", [("w1","w1"), ("w2","w2")])]   -- knowledge: reflexive
+                 [("a", [("w1","w2"), ("w2","w2")])]   -- belief: serial, not reflexive
+        mB = mkEpistemicModel frB [("p", ["w1"])]      -- p is true only at w1
+
+    it "Belief is non-factive: B_a p can be true while p is false" $ do
+      -- At w1: p holds, but agent's belief reaches only w2 (where p is false)
+      eSatisfies mB "w1" (Atom "p") `shouldBe` True
+      eSatisfies mB "w1" (Belief "a" tp) `shouldBe` False
+      -- At w1: agent believes ¬p (since the only doxastic successor w2 has ¬p)
+      eSatisfies mB "w1" (Belief "a" (Not tp)) `shouldBe` True
+      -- Knowledge of p coincides with p at w1 (reflexive)
+      eSatisfies mB "w1" (Knowledge "a" tp) `shouldBe` True
+
+    it "Knowledge and Belief use independent relations" $ do
+      -- Two clinicians can disagree without contradicting the model
+      let frD = mkEpistemicFrameWithBelief
+                   ["w1", "w2", "w3"]
+                   []
+                   [ ("radA", [("w1","w2")])    -- radA's belief world: w2 (PE holds)
+                   , ("radB", [("w1","w3")]) ]  -- radB's belief world: w3 (PE absent)
+          mD = mkEpistemicModel frD [("PE", ["w2"])]
+      eSatisfies mD "w1" (Belief "radA" (Atom "PE")) `shouldBe` True
+      eSatisfies mD "w1" (Belief "radB" (Not (Atom "PE"))) `shouldBe` True
+
+  describe "Doxastic D-axiom rule (consistency tableau)" $ do
+    -- Build the same combined system used by gamen-validate's check_consistency.
+    let consistencySys = systemKDt
+          { systemName = "KDt+doxasticD"
+          , usedPrefixRules = usedPrefixRules systemKDt ++ doxasticRules
+          }
+        pe = Atom "PE"
+
+    it "two clinicians disagreeing is consistent (cwyde core case)" $
+      tableauConsistent consistencySys
+        [Belief "radA" pe, Belief "radB" (Not pe)]
+        `shouldBe` True
+
+    it "single agent's contradictory beliefs is inconsistent (D axiom)" $
+      tableauConsistent consistencySys
+        [Belief "radA" pe, Belief "radA" (Not pe)]
+        `shouldBe` False
+
+    it "B_a p ∧ ¬p is consistent (belief is non-factive)" $
+      tableauConsistent consistencySys
+        [Belief "radA" pe, Not pe]
+        `shouldBe` True
+
+    it "B_a p ∧ ¬B_a p is propositionally inconsistent" $
+      tableauConsistent consistencySys
+        [Belief "radA" pe, Not (Belief "radA" pe)]
+        `shouldBe` False
 
   describe "Public announcement (Definition 15.11)" $ do
     let fr = mkEpistemicFrame ["w1", "w2", "w3"]

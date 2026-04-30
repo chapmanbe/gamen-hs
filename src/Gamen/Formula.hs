@@ -38,7 +38,8 @@ data Formula
   | PastDiamond Formula       -- ^ PA (previously)
   | Since Formula Formula     -- ^ S B C (B since C)
   | Until Formula Formula     -- ^ U B C (B until C)
-  | Knowledge String Formula  -- ^ K_a A (agent a knows A)
+  | Knowledge String Formula  -- ^ K_a A (agent a knows A; factive)
+  | Belief String Formula     -- ^ B_a A (agent a believes A; non-factive, KD45)
   | Announce Formula Formula  -- ^ [B]C (public announcement)
   | Stit String Formula       -- ^ [i]A (agent i sees to it that A)
   | GroupStit Formula          -- ^ [Agt]A (grand coalition stit)
@@ -81,6 +82,8 @@ instance Show Formula where
     shows l . showString " U " . shows r
   showsPrec _ (Knowledge a f) = showString "K[" . showString a
     . showString "]" . showsPrec 10 f
+  showsPrec _ (Belief a f) = showString "B[" . showString a
+    . showString "]" . showsPrec 10 f
   showsPrec _ (Announce b c) = showString "[" . shows b
     . showString "]" . showsPrec 10 c
   showsPrec _ (Stit a f)    = showString "[" . showString a
@@ -115,6 +118,7 @@ isModalFree (PastDiamond _)   = False
 isModalFree (Since _ _)       = False
 isModalFree (Until _ _)       = False
 isModalFree (Knowledge _ _)   = False
+isModalFree (Belief _ _)      = False
 isModalFree (Announce _ _)    = False
 isModalFree (Stit _ _)        = False
 isModalFree (GroupStit _)     = False
@@ -144,6 +148,7 @@ atoms (PastDiamond f)   = atoms f
 atoms (Since l r)       = atoms l `Set.union` atoms r
 atoms (Until l r)       = atoms l `Set.union` atoms r
 atoms (Knowledge _ f)   = atoms f
+atoms (Belief _ f)      = atoms f
 atoms (Announce b c)    = atoms b `Set.union` atoms c
 atoms (Stit _ f)        = atoms f
 atoms (GroupStit f)     = atoms f

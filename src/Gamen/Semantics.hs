@@ -105,6 +105,8 @@ satisfies m t (Until b c) =
 -- Use Gamen.Epistemic for multi-agent epistemic models.
 satisfies _ _ (Knowledge _ _) =
   error "Knowledge operator requires an EpistemicModel (use Gamen.Epistemic)"
+satisfies _ _ (Belief _ _) =
+  error "Belief operator requires an EpistemicModel (use Gamen.Epistemic)"
 satisfies _ _ (Announce _ _) =
   error "Announce operator requires an EpistemicModel (use Gamen.Epistemic)"
 satisfies _ _ (Stit _ _) =

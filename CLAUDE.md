@@ -20,13 +20,14 @@ This is a collaborative project between Brian Chapman (health informatics resear
 
 | Module | Source | Status | Description |
 |--------|--------|--------|-------------|
-| `Gamen.Formula` | B&D + STIT papers | Done | 24-constructor formula ADT |
+| `Gamen.Formula` | B&D + STIT papers | Done | 25-constructor formula ADT |
 | `Gamen.Kripke` | B&D Ch. 1 | Done | Kripke frames and models |
 | `Gamen.Semantics` | B&D Ch. 1 | Done | Satisfaction relation |
 | `Gamen.FrameProperties` | B&D Ch. 2 | Done | Frame predicates + frame validity |
 | `Gamen.Tableau` | B&D Ch. 6 | Done | Prefixed tableau for K/KT/KD/KB/K4/S4/S5 with blocking |
-| `Gamen.Temporal` | B&D Ch. 14 | Done | G/F/H/P operators, KDt system |
-| `Gamen.Epistemic` | B&D Ch. 15 | Done | Multi-agent knowledge, announcements, bisimulation |
+| `Gamen.Temporal` | B&D Ch. 14 | Done | G/F/H/P operators, KDt system (past rules added 2026-04) |
+| `Gamen.Epistemic` | B&D Ch. 15 | Done | Multi-agent knowledge + belief, announcements, bisimulation |
+| `Gamen.Doxastic` | KD45 | Done | Belief operator B_a; D-axiom tableau rule |
 | `Gamen.Stit` | Lorini 2013 | Done | T-STIT model checking, constraint C1-C7 |
 | `Gamen.Laca` | Herzig et al. 2022 | Done | Finite control-and-attempt STIT |
 | `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT: ought/permitted, duty/compliance/fulfillment |
@@ -37,7 +38,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (190 tests)
+- `cabal test --enable-tests` — run tests (199 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
@@ -45,19 +46,20 @@ Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 - Follow standard Haskell style: camelCase for functions/variables, PascalCase for types/constructors
 - Use `GHC2021` language standard (enables common extensions by default)
 - Use qualified imports for containers: `import Data.Map.Strict qualified as Map`
-- Every function on `Formula` must handle all 24 constructors — rely on GHC's exhaustiveness warnings
+- Every function on `Formula` must handle all 25 constructors — rely on GHC's exhaustiveness warnings
 - Modules under `Gamen.*` namespace
 - Tests use hspec
 
 ## Architecture
 
-### Formula ADT (24 constructors)
+### Formula ADT (25 constructors)
 
 Single closed algebraic data type. Adding a constructor requires updating every pattern-matching function — the compiler enforces this. Constructors span:
 - Propositional: Bot, Atom, Not, And, Or, Implies, Iff
 - Modal: Box, Diamond
 - Temporal: FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until
 - Epistemic: Knowledge, Announce
+- Doxastic: Belief
 - STIT: Stit, GroupStit, Settled, Next
 - Deontic STIT: Ought, Permitted
 

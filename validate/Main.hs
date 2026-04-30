@@ -21,10 +21,14 @@
 --
 -- Formula JSON formats (both accepted):
 --
---   Tree format (round-trips with ToJSON, supports all 24 constructors):
+--   Tree format (round-trips with ToJSON, supports all 25 constructors):
 --     {"type": "box", "operand": {"type": "implies",
 --       "left": {"type": "atom", "name": "p"},
 --       "right": {"type": "atom", "name": "q"}}}
+--
+--   Doxastic example (cwyde belief encoding):
+--     {"type": "belief", "agent": "radA",
+--      "operand": {"type": "atom", "name": "PE"}}
 --
 --   Flat extraction format (compact, for LLM-extracted recommendations):
 --     {"op": "box", "atom": "statin", "agent": "clinician",
@@ -42,8 +46,9 @@ import Data.Text qualified as T
 import System.IO (hFlush, hSetBuffering, stdout, stdin, BufferMode(..))
 
 import Gamen.Formula
-import Gamen.Tableau (tableauConsistent, tableauProves, System, systemKD)
+import Gamen.Tableau (tableauConsistent, tableauProves, System(..), systemKD)
 import Gamen.Temporal (systemKDt)
+import Gamen.Doxastic (doxasticRules)
 
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -97,6 +102,7 @@ parseTreeFormat o typ = case typ of
   "since"           -> Since <$> o .: "left" <*> o .: "right"
   "until"           -> Until <$> o .: "left" <*> o .: "right"
   "knowledge"       -> Knowledge . T.unpack <$> o .: "agent" <*> o .: "operand"
+  "belief"          -> Belief . T.unpack <$> o .: "agent" <*> o .: "operand"
   "announce"        -> Announce <$> o .: "left" <*> o .: "right"
   "stit"            -> Stit . T.unpack <$> o .: "agent" <*> o .: "operand"
   "group_stit"      -> GroupStit <$> o .: "operand"
@@ -171,6 +177,7 @@ instance ToJSON Formula where
   toJSON (Since l r)   = object ["type" .= ("since" :: Text), "left" .= l, "right" .= r]
   toJSON (Until l r)   = object ["type" .= ("until" :: Text), "left" .= l, "right" .= r]
   toJSON (Knowledge a f) = object ["type" .= ("knowledge" :: Text), "agent" .= a, "operand" .= f]
+  toJSON (Belief a f)    = object ["type" .= ("belief" :: Text), "agent" .= a, "operand" .= f]
   toJSON (Announce b c)  = object ["type" .= ("announce" :: Text), "left" .= b, "right" .= c]
   toJSON (Stit a f)    = object ["type" .= ("stit" :: Text), "agent" .= a, "operand" .= f]
   toJSON (GroupStit f)  = object ["type" .= ("group_stit" :: Text), "operand" .= f]
@@ -233,8 +240,9 @@ handleRequest Ping = OkResult (toJSON ("pong" :: Text))
 handleRequest (CheckConsistency formulas) =
   -- Normalize: strip agent-relative operators down to Box/Diamond
   -- so the KD tableau can check them. Ought a p → Box p, Permitted a p → Diamond p.
+  -- Belief is preserved (passed through) so the doxastic D rule can fire.
   let normalized = map normalizeForTableau formulas
-      consistent = tableauConsistent systemKDt normalized
+      consistent = tableauConsistent consistencySystem normalized
   in OkResult $ object
       [ "consistent" .= consistent
       , "formula_count" .= length formulas
@@ -305,6 +313,15 @@ handleRequest (CheckPairwise formulas) =
       ]
 
 
+-- | KDt + doxastic D axiom: the system used by 'CheckConsistency'.
+-- Extends 'systemKDt' with the doxastic D-rule so single-agent
+-- contradictory beliefs (B_a p ∧ B_a ¬p) close.
+consistencySystem :: System
+consistencySystem = systemKDt
+  { systemName = "KDt+doxasticD"
+  , usedPrefixRules = usedPrefixRules systemKDt ++ doxasticRules
+  }
+
 -- | Normalize agent-relative formulas for KD tableau checking.
 -- Strips Ought/Permitted/Stit down to Box/Diamond so the tableau prover
 -- (which only handles basic modal logic) can check consistency.
@@ -325,6 +342,7 @@ normalizeForTableau (FutureBox f)    = FutureBox (normalizeForTableau f)
 normalizeForTableau (FutureDiamond f) = FutureDiamond (normalizeForTableau f)
 normalizeForTableau (PastBox f)      = PastBox (normalizeForTableau f)
 normalizeForTableau (PastDiamond f)  = PastDiamond (normalizeForTableau f)
+normalizeForTableau (Belief a f)     = Belief a (normalizeForTableau f)
 normalizeForTableau f                = f  -- Atom, Bot, etc. pass through
 
 

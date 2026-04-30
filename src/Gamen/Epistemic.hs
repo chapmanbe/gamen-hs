@@ -8,9 +8,11 @@ module Gamen.Epistemic
   , EpistemicFrame(..)
   , EpistemicModel(..)
   , mkEpistemicFrame
+  , mkEpistemicFrameWithBelief
   , mkEpistemicModel
   , agents
   , eAccessible
+  , eDoxasticAccessible
     -- * Semantics (Definition 15.5, 15.11)
   , eSatisfies
   , eIsTrueIn
@@ -42,9 +44,20 @@ type Agent = String
 -- --------------------------------------------------------------------
 
 -- | A multi-agent epistemic frame with per-agent accessibility relations.
+--
+-- @eRelations@ are the epistemic (knowledge) relations, conventionally S5
+-- equivalence relations (reflexive, symmetric, transitive — making knowledge
+-- factive).
+--
+-- @eDoxastic@ are the doxastic (belief) relations, conventionally KD45
+-- (serial, transitive, euclidean — non-factive). Belief is non-factive so
+-- the relations are typically /not/ reflexive: an agent can believe
+-- something false. Empty by default; populate only if Belief operators are
+-- in use.
 data EpistemicFrame = EpistemicFrame
   { eWorlds    :: Set World
   , eRelations :: Map Agent (Map World (Set World))
+  , eDoxastic  :: Map Agent (Map World (Set World))
   } deriving (Eq, Show)
 
 -- | A multi-agent epistemic model M = ⟨W, {R_a}, V⟩.
@@ -53,15 +66,31 @@ data EpistemicModel = EpistemicModel
   , eValuation :: Map String (Set World)
   } deriving (Eq, Show)
 
--- | Construct an epistemic frame from worlds and per-agent relation pairs.
+-- | Construct an epistemic frame from worlds and per-agent knowledge
+-- relation pairs. Doxastic (belief) relations are empty; use
+-- 'mkEpistemicFrameWithBelief' if you need Belief operators.
 mkEpistemicFrame :: [World] -> [(Agent, [(World, World)])] -> EpistemicFrame
-mkEpistemicFrame ws agentRels = EpistemicFrame
+mkEpistemicFrame ws agentRels =
+  mkEpistemicFrameWithBelief ws agentRels []
+
+-- | Construct an epistemic frame with both knowledge and belief relations.
+-- Belief relations are conventionally KD45 (serial, transitive, euclidean —
+-- /not/ reflexive, since belief is non-factive).
+mkEpistemicFrameWithBelief
+  :: [World]
+  -> [(Agent, [(World, World)])]   -- ^ knowledge (S5)
+  -> [(Agent, [(World, World)])]   -- ^ belief (KD45)
+  -> EpistemicFrame
+mkEpistemicFrameWithBelief ws agentRels doxRels = EpistemicFrame
   { eWorlds = Set.fromList ws
-  , eRelations = Map.fromList
-      [(agent, Map.fromListWith Set.union
-          [(from, Set.singleton to) | (from, to) <- rels])
-      | (agent, rels) <- agentRels]
+  , eRelations = relMap agentRels
+  , eDoxastic  = relMap doxRels
   }
+  where
+    relMap rels = Map.fromList
+      [(agent, Map.fromListWith Set.union
+          [(from, Set.singleton to) | (from, to) <- pairs])
+      | (agent, pairs) <- rels]
 
 -- | Construct an epistemic model from a frame and valuation pairs.
 mkEpistemicModel :: EpistemicFrame -> [(String, [World])] -> EpistemicModel
@@ -74,10 +103,17 @@ mkEpistemicModel fr vals = EpistemicModel
 agents :: EpistemicFrame -> Set Agent
 agents = Map.keysSet . eRelations
 
--- | Worlds accessible by agent from world.
+-- | Worlds knowledge-accessible by agent from world.
 eAccessible :: EpistemicFrame -> Agent -> World -> Set World
 eAccessible fr agent w =
   case Map.lookup agent (eRelations fr) of
+    Nothing  -> Set.empty
+    Just rel -> Map.findWithDefault Set.empty w rel
+
+-- | Worlds doxastically (belief-)accessible by agent from world.
+eDoxasticAccessible :: EpistemicFrame -> Agent -> World -> Set World
+eDoxasticAccessible fr agent w =
+  case Map.lookup agent (eDoxastic fr) of
     Nothing  -> Set.empty
     Just rel -> Map.findWithDefault Set.empty w rel
 
@@ -122,6 +158,11 @@ eSatisfies _ _ (Permitted _ _)   = error "Permitted not supported in epistemic m
 eSatisfies m w (Knowledge agent f) =
   all (\w' -> eSatisfies m w' f) (eAccessible (eFrame m) agent w)
 
+-- B_a B: true at w iff B holds at all doxastic-R_a-successors of w
+-- (KD45 — non-factive; uses the doxastic accessibility relation)
+eSatisfies m w (Belief agent f) =
+  all (\w' -> eSatisfies m w' f) (eDoxasticAccessible (eFrame m) agent w)
+
 -- [B]C: true at w iff (M,w ⊩ B) implies (M|B, w ⊩ C)
 eSatisfies m w (Announce b c)
   | not (eSatisfies m w b) = True  -- vacuously true
@@ -142,14 +183,15 @@ eIsTrueIn m f = all (\w -> eSatisfies m w f) (eWorlds (eFrame m))
 restrictModel :: EpistemicModel -> Formula -> EpistemicModel
 restrictModel m announcement =
   let wPrime = Set.filter (\w -> eSatisfies m w announcement) (eWorlds (eFrame m))
-      newRels = Map.map (\rel ->
+      restrict rels = Map.map (\rel ->
         Map.mapWithKey (\w succs ->
           if Set.member w wPrime
           then Set.intersection succs wPrime
-          else Set.empty) rel)
-        (eRelations (eFrame m))
-      newVal = Map.map (Set.intersection wPrime) (eValuation m)
-  in EpistemicModel (EpistemicFrame wPrime newRels) newVal
+          else Set.empty) rel) rels
+      newRels = restrict (eRelations (eFrame m))
+      newDox  = restrict (eDoxastic (eFrame m))
+      newVal  = Map.map (Set.intersection wPrime) (eValuation m)
+  in EpistemicModel (EpistemicFrame wPrime newRels newDox) newVal
 
 -- --------------------------------------------------------------------
 -- Group and common knowledge (Definition 15.3, 15.6, B&D)
@@ -223,6 +265,7 @@ fromKripkeModel m agent = EpistemicModel
   { eFrame = EpistemicFrame
       { eWorlds = worlds (frame m)
       , eRelations = Map.singleton agent (relation (frame m))
+      , eDoxastic  = Map.empty
       }
   , eValuation = valuation m
   }
