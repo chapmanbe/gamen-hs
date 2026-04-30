@@ -155,7 +155,14 @@ nextOf fr w = case Map.lookup w (rNext fr) of
 -- Key difference from T-STIT: @[a xstit]phi@ means agent a's choice
 -- guarantees phi /at the next state/. The "X" in XSTIT refers to this
 -- next-state composition.
+--
+-- Errors if @w@ is not in @xWorlds (xFrame m)@ — without this guard,
+-- non-existent worlds yield vacuously-true results for negative,
+-- universal, and modal formulas (gamen-hs#7, mirroring gamen-hs#3).
 xSatisfies :: XstitModel -> World -> Formula -> Bool
+xSatisfies m w _
+  | Set.notMember w (xWorlds (xFrame m)) =
+      error $ "xSatisfies: world " ++ show w ++ " is not in model"
 
 -- Propositional
 xSatisfies _ _ Bot = False

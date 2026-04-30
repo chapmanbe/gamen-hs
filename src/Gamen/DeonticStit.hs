@@ -114,7 +114,14 @@ dsIdealSet fr agent = Map.findWithDefault Set.empty agent (dsIdeals fr)
 -- --------------------------------------------------------------------
 
 -- | M, w |= phi for DS models.
+--
+-- Errors if @w@ is not in @dsWorlds (dsFrame m)@ — without this guard,
+-- non-existent worlds yield vacuously-true results for negative,
+-- universal, and modal formulas (gamen-hs#7, mirroring gamen-hs#3).
 dsSatisfies :: DSModel -> World -> Formula -> Bool
+dsSatisfies m w _
+  | Set.notMember w (dsWorlds (dsFrame m)) =
+      error $ "dsSatisfies: world " ++ show w ++ " is not in model"
 
 -- Propositional
 dsSatisfies _ _ Bot = False

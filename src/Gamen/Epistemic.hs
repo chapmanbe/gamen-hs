@@ -125,7 +125,14 @@ eDoxasticAccessible fr agent w =
 
 -- | M, w ⊩ A for epistemic models. Handles all formula constructors
 -- including Knowledge and Announce.
+--
+-- Errors if @w@ is not in @eWorlds (eFrame m)@ — without this guard,
+-- non-existent worlds yield vacuously-true results for negative,
+-- universal, and modal formulas (gamen-hs#7, mirroring gamen-hs#3).
 eSatisfies :: EpistemicModel -> World -> Formula -> Bool
+eSatisfies m w _
+  | Set.notMember w (eWorlds (eFrame m)) =
+      error $ "eSatisfies: world " ++ show w ++ " is not in model"
 eSatisfies _ _ Bot = False
 eSatisfies m w (AtomF a) =
   Set.member w (Map.findWithDefault Set.empty a (eValuation m))

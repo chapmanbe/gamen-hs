@@ -1500,3 +1500,62 @@ main = hspec $ do
       -- K_c(O[c xstit]safe_med): R_{K_c}(s0_h1)={s0_h1,s0_h2}
       -- O[c xstit]safe_med true at both -> clinician knows the obligation
       duties `shouldBe` [(safeMed, True)]
+
+  -- ================================================================
+  -- World-existence guards across all *Satisfies (gamen-hs#7)
+  -- ================================================================
+  --
+  -- Follow-up to gamen-hs#3: the world-existence guard ported from
+  -- the basic Kripke `satisfies` to every other model-checking
+  -- function. Each test mirrors Jeremiah's reproducer style:
+  -- evaluate (p∨q) → (¬q∧r) at a world `c` not in the model;
+  -- without the guard, the implication evaluates vacuously to True.
+
+  describe "World-existence guards (gamen-hs#7)" $ do
+    let probeFormula =
+          Implies (Or (Atom "p") (Atom "q")) (And (Not (Atom "q")) (Atom "r"))
+
+    it "eSatisfies errors on world not in EpistemicModel" $ do
+      let efr = mkEpistemicFrame ["a","b"]
+                  [("ag", [("a","a"),("a","b"),("b","b")])]
+          em  = mkEpistemicModel efr [("p", ["a","b"]), ("q", ["b"]), ("r", ["a"])]
+      eSatisfies em "a" probeFormula `shouldBe` True
+      evaluate (eSatisfies em "c" probeFormula) `shouldThrow` anyErrorCall
+
+    it "sSatisfies errors on world not in StitModel" $ do
+      let sfr = mkStitFrame ["a","b"] [("a","a"),("a","b"),("b","b")]
+                  [("ag", [("a","a"),("b","b")])] []
+          sm  = mkStitModel sfr [("p", ["a","b"]), ("q", ["b"]), ("r", ["a"])]
+      sSatisfies sm "a" probeFormula `shouldBe` True
+      evaluate (sSatisfies sm "c" probeFormula) `shouldThrow` anyErrorCall
+
+    it "dsSatisfies errors on world not in DSModel" $ do
+      let dfr = mkDSFrame ["a","b"] [("ag", [("a","a"),("b","b")])]
+                  [("ag", ["a"])]
+          dm  = mkDSModel dfr [("p", ["a","b"]), ("q", ["b"]), ("r", ["a"])]
+      dsSatisfies dm "a" probeFormula `shouldBe` True
+      evaluate (dsSatisfies dm "c" probeFormula) `shouldThrow` anyErrorCall
+
+    it "xSatisfies errors on world not in XstitModel" $ do
+      let xfr = mkXstitFrame ["a","b"] [("a","b"),("b","b")]
+                  [("a","a"),("b","b")]
+                  [("ag", [("a","a"),("b","b")])]
+                  [("ag", [("a","a"),("b","b")])]
+          xm  = mkXstitModel xfr [("p", ["a","b"]), ("q", ["b"]), ("r", ["a"])]
+      xSatisfies xm "a" probeFormula `shouldBe` True
+      evaluate (xSatisfies xm "c" probeFormula) `shouldThrow` anyErrorCall
+
+    -- LACA's domain check is shaped differently: states are required
+    -- to be complete propositional valuations over the model's atoms.
+    -- A state that is missing or has stray atoms is malformed.
+    it "lSatisfies errors on state with stray atom" $ do
+      let lm  = mkLacaModel [("p","ag"), ("q","ag")]
+          stray = Map.fromList [("p", True), ("q", False), ("zzz", True)]
+      evaluate (lSatisfies lm stray Set.empty (Atom "p"))
+        `shouldThrow` anyErrorCall
+
+    it "lSatisfies errors on state missing an atom" $ do
+      let lm  = mkLacaModel [("p","ag"), ("q","ag")]
+          partial = Map.fromList [("p", True)]
+      evaluate (lSatisfies lm partial Set.empty (Atom "p"))
+        `shouldThrow` anyErrorCall

@@ -150,7 +150,14 @@ moment fr = sAccessible (rSettled fr)
 -- --------------------------------------------------------------------
 
 -- | M, w |= A for T-STIT models.
+--
+-- Errors if @w@ is not in @sWorlds (sFrame m)@ — without this guard,
+-- non-existent worlds yield vacuously-true results for negative,
+-- universal, and modal formulas (gamen-hs#7, mirroring gamen-hs#3).
 sSatisfies :: StitModel -> World -> Formula -> Bool
+sSatisfies m w _
+  | Set.notMember w (sWorlds (sFrame m)) =
+      error $ "sSatisfies: world " ++ show w ++ " is not in model"
 
 -- Propositional
 sSatisfies _ _ Bot = False

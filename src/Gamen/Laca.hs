@@ -101,7 +101,19 @@ trajectory s0 attempts maxLen = go s0 maxLen Set.empty []
 -- For simplicity, we evaluate at the given state directly (n=0) and
 -- use the successor function to handle X and G. The Chellas stit
 -- [J cstit]phi quantifies over all possible attempts by non-J agents.
+-- | M, s, J |= phi for LACA models.
+--
+-- Errors if the state's atom set does not match the model's
+-- 'lacaAtoms' — without this guard, evaluating an atom not declared in
+-- the model silently defaults to False, producing vacuously-true results
+-- for negation and implication (gamen-hs#7, mirroring gamen-hs#3).
+-- LACA states are required to be /complete/ propositional valuations
+-- over the model's atoms, so this is the natural domain check.
 lSatisfies :: LacaModel -> LacaState -> Set String -> Formula -> Bool
+lSatisfies m s _ _
+  | Map.keysSet s /= lacaAtoms m =
+      error $ "lSatisfies: state's atom set " ++ show (Map.keysSet s)
+           ++ " does not match model's lacaAtoms " ++ show (lacaAtoms m)
 
 -- Propositional
 lSatisfies _ s _ Bot = False
