@@ -63,7 +63,7 @@ data EpistemicFrame = EpistemicFrame
 -- | A multi-agent epistemic model M = ⟨W, {R_a}, V⟩.
 data EpistemicModel = EpistemicModel
   { eFrame     :: EpistemicFrame
-  , eValuation :: Map String (Set World)
+  , eValuation :: Map Atom (Set World)
   } deriving (Eq, Show)
 
 -- | Construct an epistemic frame from worlds and per-agent knowledge
@@ -93,10 +93,12 @@ mkEpistemicFrameWithBelief ws agentRels doxRels = EpistemicFrame
       | (agent, pairs) <- rels]
 
 -- | Construct an epistemic model from a frame and valuation pairs.
+-- Takes 'String'-keyed input for ergonomic call sites; internally
+-- wraps each name as an 'Atom'.
 mkEpistemicModel :: EpistemicFrame -> [(String, [World])] -> EpistemicModel
 mkEpistemicModel fr vals = EpistemicModel
   { eFrame = fr
-  , eValuation = Map.fromList [(atom, Set.fromList ws) | (atom, ws) <- vals]
+  , eValuation = Map.fromList [(MkAtom name, Set.fromList ws) | (name, ws) <- vals]
   }
 
 -- | The set of agents in a frame.
@@ -125,8 +127,8 @@ eDoxasticAccessible fr agent w =
 -- including Knowledge and Announce.
 eSatisfies :: EpistemicModel -> World -> Formula -> Bool
 eSatisfies _ _ Bot = False
-eSatisfies m w (Atom name) =
-  Set.member w (Map.findWithDefault Set.empty name (eValuation m))
+eSatisfies m w (AtomF a) =
+  Set.member w (Map.findWithDefault Set.empty a (eValuation m))
 eSatisfies m w (Not f)       = not (eSatisfies m w f)
 eSatisfies m w (And l r)     = eSatisfies m w l && eSatisfies m w r
 eSatisfies m w (Or l r)      = eSatisfies m w l || eSatisfies m w r

@@ -17,6 +17,8 @@ import Data.Map.Strict qualified as Map
 import Data.Set (Set)
 import Data.Set qualified as Set
 
+import Gamen.Formula (Atom (MkAtom))
+
 -- | A world is just a name.
 type World = String
 
@@ -32,9 +34,13 @@ data Frame = Frame
 
 -- | A Kripke model M = ⟨W, R, V⟩ where V maps each propositional
 -- variable to the set of worlds where it is true (Definition 1.6, B&D).
+--
+-- The valuation is keyed by 'Atom' (not the underlying 'String'): the
+-- valuation IS a function from atoms to sets of worlds, and the type
+-- now reflects that (gamen-hs#4).
 data Model = Model
   { frame     :: Frame
-  , valuation :: Map String (Set World)
+  , valuation :: Map Atom (Set World)
   } deriving (Eq, Show)
 
 -- | The worlds accessible from a given world.
@@ -58,12 +64,15 @@ mkFrame ws rels = Frame
 
 -- | Construct a model from a frame and valuation pairs.
 --
--- Mirrors the Julia convenience constructor:
+-- Takes 'String'-keyed input for ergonomic call sites (mirrors Gamen.jl's
+-- preserved Symbol-keyed convenience constructor); internally wraps
+-- each name as an 'Atom'.
+--
 --   KripkeModel(frame, [:p => [:w1, :w2], :q => [:w2]])
 mkModel :: Frame -> [(String, [World])] -> Model
 mkModel fr vals = Model
   { frame     = fr
-  , valuation = Map.fromList [(atom, Set.fromList ws) | (atom, ws) <- vals]
+  , valuation = Map.fromList [(MkAtom name, Set.fromList ws) | (name, ws) <- vals]
   }
 
 -- --------------------------------------------------------------------

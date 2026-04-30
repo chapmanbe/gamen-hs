@@ -61,7 +61,7 @@ data DSFrame = DSFrame
 -- | A DS^k_n model: frame + valuation.
 data DSModel = DSModel
   { dsFrame     :: DSFrame
-  , dsValuation :: Map String (Set World)
+  , dsValuation :: Map Atom (Set World)
   } deriving (Eq, Show)
 
 -- | Construct a DS frame.
@@ -83,7 +83,7 @@ mkDSFrame ws agentPairs idealPairs = DSFrame
 mkDSModel :: DSFrame -> [(String, [World])] -> DSModel
 mkDSModel fr vals = DSModel
   { dsFrame = fr
-  , dsValuation = Map.fromList [(atom, Set.fromList ws) | (atom, ws) <- vals]
+  , dsValuation = Map.fromList [(MkAtom name, Set.fromList ws) | (name, ws) <- vals]
   }
 
 -- --------------------------------------------------------------------
@@ -118,8 +118,8 @@ dsSatisfies :: DSModel -> World -> Formula -> Bool
 
 -- Propositional
 dsSatisfies _ _ Bot = False
-dsSatisfies m w (Atom name) =
-  Set.member w (Map.findWithDefault Set.empty name (dsValuation m))
+dsSatisfies m w (AtomF a) =
+  Set.member w (Map.findWithDefault Set.empty a (dsValuation m))
 dsSatisfies m w (Not f)       = not (dsSatisfies m w f)
 dsSatisfies m w (And l r)     = dsSatisfies m w l && dsSatisfies m w r
 dsSatisfies m w (Or l r)      = dsSatisfies m w l || dsSatisfies m w r

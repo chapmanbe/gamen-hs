@@ -886,10 +886,10 @@ extractCountermodel branch =
 
       -- Valuation: collect all atoms, find which prefixes make them true
       allAtoms = Set.toList $ Set.unions [atoms (pfFormula pf) | pf <- pfs]
-      valPairs = [(a, [worldName (pfPrefix pf)
+      valPairs = [(atomName a, [worldName (pfPrefix pf)
                       | pf <- pfs
                       , pfSign pf == T
-                      , pfFormula pf == Atom a])
+                      , pfFormula pf == AtomF a])
                  | a <- allAtoms]
 
       fr = mkFrame ws rels

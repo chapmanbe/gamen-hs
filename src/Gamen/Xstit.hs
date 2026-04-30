@@ -84,7 +84,7 @@ data XstitFrame = XstitFrame
 -- Violation atoms @"v_a"@ are ordinary atoms in the valuation.
 data XstitModel = XstitModel
   { xFrame     :: XstitFrame
-  , xValuation :: Map String (Set World)
+  , xValuation :: Map Atom (Set World)
   } deriving (Eq, Show)
 
 -- | Construct an XSTIT frame.
@@ -111,7 +111,7 @@ mkXstitFrame ws nextPairs settledPairs choicePairs epistemicPairs = XstitFrame
 mkXstitModel :: XstitFrame -> [(String, [World])] -> XstitModel
 mkXstitModel fr vals = XstitModel
   { xFrame = fr
-  , xValuation = Map.fromList [(atom, Set.fromList ws) | (atom, ws) <- vals]
+  , xValuation = Map.fromList [(MkAtom name, Set.fromList ws) | (name, ws) <- vals]
   }
 
 -- --------------------------------------------------------------------
@@ -159,8 +159,8 @@ xSatisfies :: XstitModel -> World -> Formula -> Bool
 
 -- Propositional
 xSatisfies _ _ Bot = False
-xSatisfies m w (Atom name) =
-  Set.member w (Map.findWithDefault Set.empty name (xValuation m))
+xSatisfies m w (AtomF a) =
+  Set.member w (Map.findWithDefault Set.empty a (xValuation m))
 xSatisfies m w (Not f)       = not (xSatisfies m w f)
 xSatisfies m w (And l r)     = xSatisfies m w l && xSatisfies m w r
 xSatisfies m w (Or l r)      = xSatisfies m w l || xSatisfies m w r

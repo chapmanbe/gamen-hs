@@ -1,10 +1,22 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Modal logic formulas (Definition 1.2, B&D).
 --
 -- This single data type replaces the entire Formula type hierarchy
 -- from the Julia implementation (8 structs + equality + hash + show).
 -- Pattern matching is exhaustive — GHC warns if you miss a case.
 module Gamen.Formula
-  ( Formula(..)
+  ( -- * Atoms (propositional variables)
+    Atom (MkAtom, atomName)
+    -- * Formulas
+  , Formula (Bot, Not, And, Or, Implies, Iff,
+             Box, Diamond,
+             FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until,
+             Knowledge, Belief, Announce,
+             Stit, GroupStit, Settled, Next,
+             Ought, Permitted,
+             AtomF)
+  , pattern Atom
   , top
   , isModalFree
   , atoms
@@ -16,15 +28,25 @@ module Gamen.Formula
 import Data.Set (Set)
 import Data.Set qualified as Set
 
+-- | A propositional atom (variable). Wraps a name; kept as a separate
+-- type from 'String' so that 'atoms' and valuation maps are typed at
+-- the atom level rather than the leaky 'String' representation
+-- (gamen-hs#5, mirroring Gamen.jl#1, #7).
+newtype Atom = MkAtom { atomName :: String }
+  deriving (Eq, Ord)
+
+-- | An atom prints as its bare name.
+instance Show Atom where
+  show = atomName
+
 -- | A formula in propositional modal logic.
 --
--- Compare with Julia's Gamen.jl where each constructor is a separate
--- struct type. Here, one algebraic data type does the same job, with
--- structural equality ('Eq'), ordering ('Ord'), and display ('Show')
--- derived automatically.
+-- The 'AtomF' constructor wraps an 'Atom' value. Use the 'Atom' pattern
+-- synonym in client code; it gives the historical @Atom \"p\"@ syntax
+-- while keeping the underlying type cleanly separated.
 data Formula
   = Bot                       -- ^ ⊥ (falsity)
-  | Atom String               -- ^ Propositional variable
+  | AtomF Atom                -- ^ Propositional variable (use the 'Atom' pattern)
   | Not Formula               -- ^ ¬A
   | And Formula Formula       -- ^ A ∧ B
   | Or Formula Formula        -- ^ A ∨ B
@@ -48,6 +70,21 @@ data Formula
   | Ought String Formula       -- ^ ⊗_i A (agent i ought to see to it that A)
   | Permitted String Formula   -- ^ ⊖_i A (agent i is permitted to see to it that A)
   deriving (Eq, Ord)
+
+-- | Bidirectional pattern synonym so that @Atom "p"@ continues to work
+-- as both a Formula constructor and a pattern. Lets every existing
+-- caller keep the @Atom "p"@ surface syntax while 'AtomF' carries the
+-- properly typed 'Atom' value internally.
+pattern Atom :: String -> Formula
+pattern Atom n <- AtomF (MkAtom n)
+  where Atom n = AtomF (MkAtom n)
+
+{-# COMPLETE Bot, Atom, Not, And, Or, Implies, Iff,
+             Box, Diamond,
+             FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until,
+             Knowledge, Belief, Announce,
+             Stit, GroupStit, Settled, Next,
+             Ought, Permitted #-}
 
 -- | ⊤ abbreviates ¬⊥ (Definition 1.3, item 1).
 top :: Formula
@@ -127,13 +164,14 @@ isModalFree (Next _)          = False
 isModalFree (Ought _ _)       = False
 isModalFree (Permitted _ _)   = False
 
--- | Collect all atomic proposition names in a formula.
+-- | Collect all atomic propositions in a formula.
 --
--- This is the Haskell equivalent of Julia's _collect_atoms!.
--- Note: we return a Set (no duplicates, no mutation needed).
-atoms :: Formula -> Set String
+-- Returns @Set Atom@ rather than @Set String@ — the result is typed at
+-- the atom level so callers do not have to reconstruct atoms from raw
+-- names (gamen-hs#5).
+atoms :: Formula -> Set Atom
 atoms Bot           = Set.empty
-atoms (Atom name)   = Set.singleton name
+atoms (AtomF a)     = Set.singleton a
 atoms (Not f)       = atoms f
 atoms (And l r)     = atoms l `Set.union` atoms r
 atoms (Or l r)      = atoms l `Set.union` atoms r

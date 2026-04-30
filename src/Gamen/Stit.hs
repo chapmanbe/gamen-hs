@@ -62,7 +62,7 @@ data StitFrame = StitFrame
 -- | A T-STIT model: frame + valuation.
 data StitModel = StitModel
   { sFrame     :: StitFrame
-  , sValuation :: Map String (Set World)
+  , sValuation :: Map Atom (Set World)
   } deriving (Eq, Show)
 
 -- | Construct a T-STIT frame.
@@ -94,7 +94,7 @@ mkStitFrame ws settledPairs agentPairs futurePairs = StitFrame
 mkStitModel :: StitFrame -> [(String, [World])] -> StitModel
 mkStitModel fr vals = StitModel
   { sFrame = fr
-  , sValuation = Map.fromList [(atom, Set.fromList ws) | (atom, ws) <- vals]
+  , sValuation = Map.fromList [(MkAtom name, Set.fromList ws) | (name, ws) <- vals]
   }
 
 -- | Invert a relation: R_H = R_G^{-1}.
@@ -154,8 +154,8 @@ sSatisfies :: StitModel -> World -> Formula -> Bool
 
 -- Propositional
 sSatisfies _ _ Bot = False
-sSatisfies m w (Atom name) =
-  Set.member w (Map.findWithDefault Set.empty name (sValuation m))
+sSatisfies m w (AtomF a) =
+  Set.member w (Map.findWithDefault Set.empty a (sValuation m))
 sSatisfies m w (Not f)       = not (sSatisfies m w f)
 sSatisfies m w (And l r)     = sSatisfies m w l && sSatisfies m w r
 sSatisfies m w (Or l r)      = sSatisfies m w l || sSatisfies m w r

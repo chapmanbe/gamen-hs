@@ -143,7 +143,7 @@ isValidOnFrame fr formula
         [0 .. nValuations - 1]
   where
     vars = atoms formula
-    varList = Set.toList vars
+    varList = map atomName (Set.toList vars)
     worldList = Set.toList (worlds fr)
     nWorlds = length worldList
     nValuations :: Integer

@@ -47,8 +47,22 @@ main = hspec $ do
 
     it "collects atoms" $ do
       atoms (Implies (Box (Atom "p")) (Diamond (Atom "q")))
-        `shouldBe` Set.fromList ["p", "q"]
+        `shouldBe` Set.fromList [MkAtom "p", MkAtom "q"]
       atoms Bot `shouldBe` Set.empty
+
+    -- gamen-hs#5 / Gamen.jl#7: atoms returns Set Atom (not Set String)
+    -- so the result is typed at the atom level rather than the leaky
+    -- String representation.
+    it "atoms returns properly typed Atom values" $ do
+      let phi = And (Atom "p") (Box (Atom "q"))
+      -- The bare name is recoverable via the atomName field accessor
+      Set.map atomName (atoms phi) `shouldBe` Set.fromList ["p", "q"]
+      -- Atom shows as just its name (no MkAtom prefix)
+      show (MkAtom "p") `shouldBe` "p"
+      -- Pattern synonym round-trips: building with Atom "p" and
+      -- destructuring back yields the same name
+      case Atom "p" of
+        Atom n -> n `shouldBe` "p"
 
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]
@@ -873,7 +887,7 @@ main = hspec $ do
       isModalFree (Belief "a" tp) `shouldBe` False
 
     it "atoms recurses into Belief" $
-      atoms (Belief "a" (And tp tq)) `shouldBe` Set.fromList ["p", "q"]
+      atoms (Belief "a" (And tp tq)) `shouldBe` Set.fromList [MkAtom "p", MkAtom "q"]
 
     -- Model-checking with separate doxastic relations.
     -- Knowledge ("a" is reflexive at w1: T axiom holds).
@@ -996,8 +1010,8 @@ main = hspec $ do
       isModalFree (Settled tp) `shouldBe` False
 
     it "collects atoms from STIT formulas" $ do
-      atoms (Stit "i" (Implies tp tq)) `shouldBe` Set.fromList ["p", "q"]
-      atoms (GroupStit tp) `shouldBe` Set.singleton "p"
+      atoms (Stit "i" (Implies tp tq)) `shouldBe` Set.fromList [MkAtom "p", MkAtom "q"]
+      atoms (GroupStit tp) `shouldBe` Set.singleton (MkAtom "p")
 
     it "dstit smart constructor" $ do
       dstit "i" tp `shouldBe` And (Stit "i" tp) (Not (Settled tp))

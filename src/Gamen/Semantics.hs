@@ -33,8 +33,8 @@ satisfies m w _
 satisfies _ _ Bot = False
 
 -- 2. M, w ⊩ p iff w ∈ V(p)
-satisfies m w (Atom name) =
-  Set.member w (Map.findWithDefault Set.empty name (valuation m))
+satisfies m w (AtomF a) =
+  Set.member w (Map.findWithDefault Set.empty a (valuation m))
 
 -- 3. M, w ⊩ ¬A iff not M, w ⊩ A
 satisfies m w (Not f) =

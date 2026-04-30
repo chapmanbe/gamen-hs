@@ -254,7 +254,9 @@ handleRequest (ValidateFormula rawJson) =
       OkResult $ object
         [ "valid" .= True
         , "formula" .= formula
-        , "atoms" .= Set.toList (atoms formula)
+          -- Emit plain names so existing JSON consumers (cwyde,
+          -- guideline-validation) keep seeing ["p","q",...].
+        , "atoms" .= map atomName (Set.toList (atoms formula))
         , "display" .= show formula
         ]
     Error msg ->
@@ -277,7 +279,7 @@ handleRequest (ValidateAgent rawJson expectedAgent) =
             , "followup_attended", "statin_taken_daily", "ezetimibe_taken_daily"
             , "injection_administered", "fill_rx"
             ]
-          formulaAtoms = atoms formula
+          formulaAtoms = Set.map atomName (atoms formula)
           hasPatientAtoms = not (Set.null (Set.intersection formulaAtoms patientAtoms))
           concern = agentStr == "clinician" && hasPatientAtoms
       in OkResult $ object
@@ -346,11 +348,13 @@ normalizeForTableau (Belief a f)     = Belief a (normalizeForTableau f)
 normalizeForTableau f                = f  -- Atom, Bot, etc. pass through
 
 
--- | Extract atoms that appear inside agent-specific operators.
+-- | Extract atom names that appear inside agent-specific operators.
+-- Returned as plain names so that downstream JSON output stays a list
+-- of strings.
 extractAgentAtoms :: Formula -> Map.Map String (Set.Set String)
-extractAgentAtoms (Ought agent f) = Map.singleton agent (atoms f)
-extractAgentAtoms (Permitted agent f) = Map.singleton agent (atoms f)
-extractAgentAtoms (Stit agent f) = Map.singleton agent (atoms f)
+extractAgentAtoms (Ought agent f) = Map.singleton agent (Set.map atomName (atoms f))
+extractAgentAtoms (Permitted agent f) = Map.singleton agent (Set.map atomName (atoms f))
+extractAgentAtoms (Stit agent f) = Map.singleton agent (Set.map atomName (atoms f))
 extractAgentAtoms (Implies _ f) = extractAgentAtoms f  -- look inside conditionals
 extractAgentAtoms (And l r) = Map.unionWith Set.union (extractAgentAtoms l) (extractAgentAtoms r)
 extractAgentAtoms (Or l r) = Map.unionWith Set.union (extractAgentAtoms l) (extractAgentAtoms r)
