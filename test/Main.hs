@@ -6,6 +6,7 @@ import Data.Set qualified as Set
 
 import Data.Map.Strict qualified as Map
 import Gamen.DeonticStit
+import Gamen.DeonticStit.Rules
 import Gamen.DeonticStit.Sequent
 import Gamen.Epistemic
 import Gamen.Formula
@@ -229,6 +230,115 @@ main = hspec $ do
     it "RelAtom Show matches the paper's notation shape" $ do
       show (Choice "i" w0 w1) `shouldBe` "R_[i]w0w1"
       show (Ideal  "i" w2)    `shouldBe` "I_⊗_i w2"
+
+  -- G3DS^k_n inference rules — non-generating fragment (issue #8 step D, part 1).
+  describe "DeonticStit.Rules: closure and non-generating logical rules" $ do
+    let p   = Atom "p"
+        np  = Not (Atom "p")
+        q   = Atom "q"
+        w0  = label0
+        w1  = nextLabel w0
+
+    describe "isClosedSequent (id rule)" $ do
+      it "closes when w:p and w:¬p both appear" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ singletonSequent w0 np
+        isClosedSequent s `shouldBe` True
+
+      it "does not close on different labels" $ do
+        let s = addFormula (mkLabFormula w1 np)
+              $ singletonSequent w0 p
+        isClosedSequent s `shouldBe` False
+
+      it "does not close on different atoms" $ do
+        let s = addFormula (mkLabFormula w0 (Not q))
+              $ singletonSequent w0 p
+        isClosedSequent s `shouldBe` False
+
+      it "does not close the empty sequent" $ do
+        isClosedSequent emptySequent `shouldBe` False
+
+    describe "applyAnd (∧ rule)" $ do
+      it "branches w:(p∧q) into [w:p,…] and [w:q,…] premises" $ do
+        let s = singletonSequent w0 (And p q)
+        case applyAnd s of
+          Nothing -> expectationFailure "applyAnd should fire on And"
+          Just RuleApp{ raPremises = [ls, rs], raFreshLabels = fs } -> do
+            fs `shouldBe` []
+            hasFormula (mkLabFormula w0 p) ls `shouldBe` True
+            hasFormula (mkLabFormula w0 q) rs `shouldBe` True
+            -- principal stays around
+            hasFormula (mkLabFormula w0 (And p q)) ls `shouldBe` True
+            hasFormula (mkLabFormula w0 (And p q)) rs `shouldBe` True
+          Just _ -> expectationFailure "applyAnd should produce 2 premises"
+
+      it "is Nothing when the sequent has no conjunctions" $ do
+        applyAnd (singletonSequent w0 p) `shouldBe` Nothing
+
+      it "is Nothing when both conjuncts are already on Γ" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ addFormula (mkLabFormula w0 q)
+              $ singletonSequent w0 (And p q)
+        applyAnd s `shouldBe` Nothing
+
+    describe "applyOr (∨ rule)" $ do
+      it "produces one premise with both disjuncts added" $ do
+        let s = singletonSequent w0 (Or p q)
+        case applyOr s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } -> do
+            hasFormula (mkLabFormula w0 p) s' `shouldBe` True
+            hasFormula (mkLabFormula w0 q) s' `shouldBe` True
+          _ -> expectationFailure "applyOr should produce 1 premise"
+
+      it "is Nothing when both disjuncts already present" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ addFormula (mkLabFormula w0 q)
+              $ singletonSequent w0 (Or p q)
+        applyOr s `shouldBe` Nothing
+
+    describe "applyDiamond (◇ rule)" $ do
+      it "adds u:φ for an existing label u when w:◇φ ∈ Γ" $ do
+        -- Single label w0 in scope; the rule picks w0 as the witness.
+        let s = singletonSequent w0 (Diamond p)
+        case applyDiamond s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } -> do
+            hasFormula (mkLabFormula w0 p) s' `shouldBe` True
+            -- principal stays
+            hasFormula (mkLabFormula w0 (Diamond p)) s' `shouldBe` True
+          _ -> expectationFailure "applyDiamond should produce 1 premise"
+
+      it "is Nothing when φ already at every label" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ singletonSequent w0 (Diamond p)
+        applyDiamond s `shouldBe` Nothing
+
+    describe "applyChoiceDiamond (⟨i⟩ rule)" $ do
+      it "adds u:φ and u:⟨i⟩φ when R_[i]wu ∈ ℛ and w:⟨i⟩φ ∈ Γ" $ do
+        let s = addRel (Choice "i" w0 w1)
+              $ singletonSequent w0 (ChoiceDiamond "i" p)
+        case applyChoiceDiamond s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } -> do
+            hasFormula (mkLabFormula w1 p) s' `shouldBe` True
+            hasFormula (mkLabFormula w1 (ChoiceDiamond "i" p)) s'
+              `shouldBe` True
+          _ -> expectationFailure "applyChoiceDiamond should produce 1 premise"
+
+      it "is Nothing without a matching R_[i] relation" $ do
+        let s = singletonSequent w0 (ChoiceDiamond "i" p)
+        applyChoiceDiamond s `shouldBe` Nothing
+
+    describe "applyPermitted (⊖_i rule)" $ do
+      it "adds u:φ when I_⊗_i u ∈ ℛ and w:⊖_i φ ∈ Γ" $ do
+        let s = addRel (Ideal "i" w1)
+              $ singletonSequent w0 (Permitted "i" p)
+        case applyPermitted s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } -> do
+            hasFormula (mkLabFormula w1 p) s' `shouldBe` True
+          _ -> expectationFailure "applyPermitted should produce 1 premise"
+
+      it "is Nothing without an Ideal relation" $ do
+        let s = singletonSequent w0 (Permitted "i" p)
+        applyPermitted s `shouldBe` Nothing
 
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]
