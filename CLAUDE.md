@@ -95,7 +95,7 @@ Prefixed signed tableaux with:
 ## Executables
 
 - `gamen-repl` — quick demo (Figure 1.1 from B&D)
-- `gamen-validate` — JSON Lines stdin/stdout service for cross-language validation. Accepts formulas in tree format (round-trips with all 24 constructors) or flat extraction format (for LLM output). Protocol documented in `validate/Main.hs`.
+- `gamen-validate` — JSON Lines stdin/stdout service for cross-language validation. Accepts formulas in tree format (round-trips with all 25 constructors) or flat extraction format (for LLM output). Protocol documented in `validate/Main.hs`.
 - `example-tableau`, `example-deontic-stit`, `example-mens-rea` — runnable examples
 
 ## Documentation
