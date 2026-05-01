@@ -779,6 +779,91 @@ main = hspec $ do
           isValidDSFrame (dsFrame m) `shouldBe` True
         _ -> expectationFailure "Ought i p should refute"
 
+  -- Worked clinical test case from issue #8 deliverable 6: AHA +
+  -- KDIGO + USDA bridge in the potassium-intake scenario. The point
+  -- is to show that the agent-aware deontic STIT prover gives a
+  -- different verdict than the agent-stripped KD path on at least
+  -- one input — demonstrating that the agency layer is load-bearing.
+  describe "Clinical scenario: AHA + KDIGO + USDA potassium (issue #8 step I)" $ do
+    let hhDiet = Atom "hh_diet"
+        highK  = Atom "high_K"
+
+        -- Mirror the old normalizeForTableau agent-stripping for
+        -- the comparison: Ought→Box, Permitted→Diamond, Stit→Box,
+        -- ChoiceDiamond→Diamond. Used only inside this test block
+        -- to reconstruct the pre-issue-#8 verdict.
+        stripAgents :: Formula -> Formula
+        stripAgents (Ought _ f)         = Box (stripAgents f)
+        stripAgents (Permitted _ f)     = Diamond (stripAgents f)
+        stripAgents (Stit _ f)          = Box (stripAgents f)
+        stripAgents (ChoiceDiamond _ f) = Diamond (stripAgents f)
+        stripAgents (GroupStit f)       = Box (stripAgents f)
+        stripAgents (Not f)             = Not (stripAgents f)
+        stripAgents (And l r)           = And (stripAgents l) (stripAgents r)
+        stripAgents (Or l r)            = Or (stripAgents l) (stripAgents r)
+        stripAgents (Implies l r)       = Implies (stripAgents l) (stripAgents r)
+        stripAgents (Iff l r)           = Iff (stripAgents l) (stripAgents r)
+        stripAgents (Box f)             = Box (stripAgents f)
+        stripAgents (Diamond f)         = Diamond (stripAgents f)
+        stripAgents (FutureBox f)       = FutureBox (stripAgents f)
+        stripAgents (FutureDiamond f)   = FutureDiamond (stripAgents f)
+        stripAgents (PastBox f)         = PastBox (stripAgents f)
+        stripAgents (PastDiamond f)     = PastDiamond (stripAgents f)
+        stripAgents (Belief a f)        = Belief a (stripAgents f)
+        stripAgents f                   = f
+
+    it "cross-agent same-atom: ⊗_p X ∧ ⊗_c ¬X — DS allows; KD rejects" $ do
+      -- The headline divergence. Patient ought to have heart-healthy
+      -- diet; clinician ought to NOT have it (e.g., contraindicated
+      -- in this patient). DS sees these as independent agent ideals
+      -- (consistent under C2 independence). KD-stripped collapses
+      -- both into Box, demanding the same world satisfy hh_diet and
+      -- ¬hh_diet — inconsistent.
+      let phis = [ Ought "patient"   hhDiet
+                 , Ought "clinician" (Not hhDiet)
+                 ]
+          dsVerdict = isFormulaSetConsistent 0 5000 phis
+          kdVerdict = tableauConsistent systemKD (map stripAgents phis)
+      dsVerdict `shouldBe` True
+      kdVerdict `shouldBe` False
+      -- The two prover paths give /different/ verdicts on this input.
+      -- This is the agent-aware reasoning issue #8 was opened to
+      -- restore: KD-stripping discards information the deontic STIT
+      -- calculus actually uses.
+      dsVerdict `shouldNotBe` kdVerdict
+
+    it "intra-agent action conflict via USDA bridge — both reject" $ do
+      -- Patient ought to have heart-healthy diet; patient ought to
+      -- avoid high potassium; bridge says hh_diet implies high_K.
+      -- At any patient-ideal world: hh_diet, ¬high_K, and the
+      -- implication — contradiction. Both provers must catch this.
+      let phis = [ Ought "patient" hhDiet
+                 , Ought "patient" (Not highK)
+                 , Box (Implies hhDiet highK)
+                 ]
+          dsVerdict = isFormulaSetConsistent 0 5000 phis
+          kdVerdict = tableauConsistent systemKD (map stripAgents phis)
+      dsVerdict `shouldBe` False
+      kdVerdict `shouldBe` False
+
+    it "advice-level + KDIGO + bridge — both consistent (no adherence axiom)" $ do
+      -- Clinician obligated to RECOMMEND heart-healthy diet (an
+      -- action attributed to the clinician, not to the patient).
+      -- Without an explicit adherence axiom linking clinician
+      -- recommendation to patient action, this scenario is
+      -- consistent: the clinician's deontic ideals concern advising
+      -- behaviour, not patient nutrition. Both provers see this as
+      -- consistent — they correctly distinguish action attribution
+      -- from outcome.
+      let phis = [ Ought "clinician" (Stit "clinician" (Atom "advise_hh_diet"))
+                 , Ought "patient"   (Not highK)
+                 , Box (Implies hhDiet highK)
+                 ]
+          dsVerdict = isFormulaSetConsistent 0 5000 phis
+          kdVerdict = tableauConsistent systemKD (map stripAgents phis)
+      dsVerdict `shouldBe` True
+      kdVerdict `shouldBe` True
+
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]
                   [("w1", "w2"), ("w1", "w3")]

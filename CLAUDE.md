@@ -43,7 +43,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (310 tests)
+- `cabal test --enable-tests` — run tests (314 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
