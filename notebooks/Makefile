@@ -21,14 +21,19 @@ NOTEBOOKS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 # Prefer Homebrew Ruby when available; fall back to whatever's on PATH.
 BREW_RUBY_BIN  := $(shell brew --prefix ruby 2>/dev/null)/bin
 BREW_GEMS_BIN  := $(shell brew --prefix 2>/dev/null)/lib/ruby/gems/4.0.0/bin
-SHELL_PATH     := $(BREW_RUBY_BIN):$(BREW_GEMS_BIN):$(PATH)
+
+# Cabal/GHC live under ghcup; Make starts with a minimal PATH so we
+# need to prepend the toolchain explicitly for the build target.
+GHCUP_BIN      := $(HOME)/.ghcup/bin
+
+SHELL_PATH     := $(GHCUP_BIN):$(BREW_RUBY_BIN):$(BREW_GEMS_BIN):$(PATH)
 
 .PHONY: build serve clean install
 
 build:
 	@for ch in $(CHAPTERS); do \
 		echo "→ $$ch" ; \
-		python3 $(NOTEBOOKS_DIR)build.py $$ch ; \
+		PATH=$(SHELL_PATH) python3 $(NOTEBOOKS_DIR)build.py $$ch ; \
 	done
 
 install:
