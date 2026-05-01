@@ -54,6 +54,9 @@ We can ask which worlds are reachable from `w`:
 accessible oneWorld "w"
 ```
 
+```output
+fromList []
+```
 The empty set, as expected — no relation means no reachable worlds.
 
 A modal Box claim like `□p` is *vacuously* true at a world with no
@@ -68,6 +71,9 @@ emptyModel = mkModel oneWorld []
 satisfies emptyModel "w" (Box (Atom "p"))
 ```
 
+```output
+True
+```
 ## Figure 1.1
 
 B&D's Figure 1.1 has three worlds — `w1`, `w2`, `w3` — with `w1`
@@ -89,6 +95,9 @@ Now we can evaluate any formula at any world. Does `□p` hold at `w1`?
 satisfies model11 "w1" (Box (Atom "p"))
 ```
 
+```output
+False
+```
 `p` holds at `w2` but not at `w3`, so `□p` is false at `w1` — the
 universal quantifier over successors fails on `w3`. What about `◇q`?
 
@@ -96,6 +105,9 @@ universal quantifier over successors fails on `w3`. What about `◇q`?
 satisfies model11 "w1" (Diamond (Atom "q"))
 ```
 
+```output
+True
+```
 `q` holds at `w2`, which is one of `w1`'s successors, so `◇q` is
 true. The dual operators behave as you'd expect: `□p` says "every
 successor satisfies p", `◇p` says "some successor does".
@@ -108,6 +120,9 @@ successor of `w1` either has `p` or `q` (or both) — `w2` has both,
 satisfies model11 "w1" (Box (Or (Atom "p") (Atom "q")))
 ```
 
+```output
+False
+```
 False, because `w3` has neither. The conjunction `p ∧ q` doesn't
 hold there either. This is the kind of fact tableau provers will
 mechanise in [Chapter 2]{.sidenote}.
@@ -122,12 +137,18 @@ plays no role. The library exposes this as `isModalFree`:
 isModalFree (And (Atom "p") (Not (Atom "q")))
 ```
 
+```output
+True
+```
 Compare with a formula that contains a `Box`:
 
 ```haskell {.eval}
 isModalFree (Box (Atom "p"))
 ```
 
+```output
+False
+```
 This distinction matters when we get to tableau search: modal-free
 formulas can be decided by the propositional rules alone, without
 ever creating a fresh world.

@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 """Build a notebook from a Markdown source file.
 
+The script is idempotent: it strips any previously-spliced ``output``
+blocks first, then runs the evals fresh, and writes the result back
+to the source path. That keeps Jekyll's source tree as the single
+view of truth and makes ``jekyll serve`` work without extra config.
+
 Pipeline:
 
-1. Find every fenced ```haskell``` code block in the input.
-2. Accumulate plain blocks as "context" (definitions, imports).
-3. For each block tagged ``{.eval}``, build a runnable Haskell
+1. Strip every existing ```output``` block from the source.
+2. Find every fenced ```haskell``` code block in the (cleaned) input.
+3. Accumulate plain blocks as "context" (definitions, imports).
+4. For each block tagged ``{.eval}``, build a runnable Haskell
    program from the accumulated context plus a ``main = print (...)``
    wrapper around the eval block's contents. Run it via
    ``cabal exec -- runghc`` from the repository root so that the
    ``gamen`` library is in scope.
-4. Splice the captured stdout back into the document as a sibling
+5. Splice the captured stdout back into the document as a sibling
    ``output`` code block.
 
 Usage:
-    python3 notebooks/build.py notebooks/01-kripke.md notebooks/build/01-kripke.md
+    python3 notebooks/build.py notebooks/01-kripke.md          # rewrites in place
+    python3 notebooks/build.py notebooks/01-kripke.md out.md   # write to out.md instead
 
 Conventions:
     ```haskell                  -- shown for reading; added to context.
@@ -25,13 +32,17 @@ Conventions:
     expr                          its print-value goes into ```output```.
     ```
 
+    ```haskell {.ghci}          -- GHCi directive; shown but not extracted.
+    :set +m
+    ```
+
     ```bash                     -- left untouched (shown to the reader).
     cabal repl gamen
     ```
 
-The script writes a sidecar ``.hs`` file alongside the processed
-Markdown — readers who'd rather ``:l`` the chapter than copy-paste it
-can use that file directly.
+A sidecar ``.hs`` file is written to ``notebooks/build/`` (gitignored)
+so readers who'd rather ``:l`` the chapter than copy-paste it can use
+that file directly.
 """
 from __future__ import annotations
 
@@ -47,6 +58,19 @@ HASKELL_BLOCK_RE = re.compile(
     r"^```haskell(?P<attrs>[^\n]*)\n(?P<code>.*?)\n```\s*$",
     re.MULTILINE | re.DOTALL,
 )
+
+# Match previously-spliced ```output blocks (and the blank line(s)
+# immediately preceding them, so a re-build doesn't pile up blank
+# lines on every iteration).
+OUTPUT_BLOCK_RE = re.compile(
+    r"\n*^```output\n.*?\n```\s*$",
+    re.MULTILINE | re.DOTALL,
+)
+
+
+def strip_outputs(text: str) -> str:
+    """Remove every ```output``` block left behind by an earlier build."""
+    return OUTPUT_BLOCK_RE.sub("", text)
 
 EVAL_ATTR_RE = re.compile(r"\beval\b")
 GHCI_ATTR_RE = re.compile(r"\bghci\b")
@@ -155,12 +179,13 @@ def process(text: str, repo_root: Path) -> tuple[str, str]:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (2, 3):
         print(__doc__, file=sys.stderr)
         return 2
 
     src = Path(sys.argv[1]).resolve()
-    out = Path(sys.argv[2]).resolve()
+    out = Path(sys.argv[2]).resolve() if len(sys.argv) == 3 else src
+
     # Walk upward until we find a .cabal file — that's the repo root
     # cabal exec needs to be invoked from.
     repo_root = src.parent
@@ -172,14 +197,16 @@ def main() -> int:
         print("error: could not find a .cabal file above the source", file=sys.stderr)
         return 1
 
-    text = src.read_text()
+    text = strip_outputs(src.read_text())
     processed_md, sidecar_hs = process(text, repo_root)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(processed_md)
 
-    # Sidecar source for readers who'd rather :load than copy-paste.
-    sidecar = out.with_suffix(".hs")
+    # Sidecar Haskell source — gitignored under notebooks/build/.
+    sidecar_dir = src.parent / "build"
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+    sidecar = sidecar_dir / (src.stem + ".hs")
     sidecar.write_text(sidecar_hs)
 
     print(f"wrote {out}")

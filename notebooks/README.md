@@ -23,22 +23,48 @@ Sidenotes and margin notes follow chapmanbe.github.io's convention:
 {% include marginnote.html id="other-id" content="Unnumbered aside (figure caption etc.)." %}
 ```
 
-## Local build
+## Local build & view
 
-From the repository root:
+The build script is idempotent — it strips any previously-spliced
+`output` blocks before re-running, so the chapter source on disk is
+always the latest rendered version.
 
 ```bash
-python3 notebooks/build.py notebooks/01-kripke.md notebooks/build/01-kripke.md
+make -f notebooks/Makefile build    # rewrites notebooks/01-kripke.md in place
+make -f notebooks/Makefile serve    # build + jekyll serve at :4000
+make -f notebooks/Makefile clean    # remove build/ and _site/
 ```
 
-This produces:
+The `serve` target runs `jekyll serve` and opens a watch loop. Edit
+the Markdown, save, and Jekyll auto-reloads — but note that Jekyll
+won't re-run `build.py`, so if you change a `{.eval}` block you need
+to rerun `make build` to refresh the captured outputs.
 
-- `notebooks/build/01-kripke.md` — the Markdown with `output` blocks
-  spliced in. This is what Jekyll renders.
-- `notebooks/build/01-kripke.hs` — a sidecar Haskell file containing
-  every non-eval code block concatenated. Readers can `cabal exec --
-  runghc -- -package gamen notebooks/build/01-kripke.hs` instead of
-  copy-pasting, and CI uses the same file as a compile-check.
+### Ruby setup
+
+The system Ruby on macOS (2.6.x) is too old. Use Homebrew's:
+
+```bash
+brew install ruby
+export PATH="$(brew --prefix ruby)/bin:$(brew --prefix)/lib/ruby/gems/4.0.0/bin:$PATH"
+make -f notebooks/Makefile install   # one-time bundle install
+```
+
+The Makefile detects the Homebrew Ruby paths automatically; you only
+need the `PATH` export in your shell rc if you want to run
+`bundle`/`jekyll` directly.
+
+### Sidecar `.hs`
+
+Each build produces `notebooks/build/<chapter>.hs` (gitignored) with
+every non-eval code block concatenated. Readers who'd rather load
+the chapter than copy-paste it can:
+
+```bash
+cabal exec -- runghc --ghc-arg=-package --ghc-arg=gamen notebooks/build/01-kripke.hs
+```
+
+CI can use the same sidecar as a compile-check.
 
 ## Deployment to GitHub Pages
 

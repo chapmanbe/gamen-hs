@@ -1,0 +1,10 @@
+source "https://rubygems.org"
+
+# Plain Jekyll 4.x — matches the brew-installed jekyll (4.4.x) and is
+# what the actions/jekyll-build-pages action runs in CI. Skipping the
+# github-pages gem (which pins Jekyll 3.10) keeps the local Ruby
+# requirements modest.
+gem "jekyll", "~> 4.4"
+
+# Ruby 3+ dropped webrick from stdlib; jekyll-serve depends on it.
+gem "webrick", "~> 1.8"
