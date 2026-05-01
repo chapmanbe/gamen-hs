@@ -29,6 +29,7 @@ library
     Gamen.Stit
     Gamen.Tableau
     Gamen.Temporal
+    Gamen.Visualize
     Gamen.Xstit
   hs-source-dirs:   src
   default-language: GHC2021

@@ -16,8 +16,9 @@ preview, and in any text editor.
 
 | First line of block | Treatment |
 |---|---|
-| *(no marker)* | Definition or import. Kept in the program context for later `-- :eval` blocks; rendered for the reader. |
+| *(no marker)* | Definition or import. Kept in the program context for later `-- :eval` / `-- :viz` blocks; rendered for the reader. |
 | `-- :eval` | Single expression. The build script wraps the rest of the block in `print (...)` and runs it; the captured output is spliced in as a sibling ` ```output ` block. |
+| `-- :viz` | Single expression returning a `String` of Graphviz `dot` source (e.g. `toGraphvizModel model11`). The build script runs the result through `dot -Tsvg`, writes the SVG to `notebooks/figures/<chapter>-fig-N.svg`, and splices an `<img>` tag back into the markdown. Requires `dot` (`brew install graphviz`). |
 | `-- :ghci` | GHCi directive (`:set`, `:t`, `:l`). Rendered for the reader but neither accumulated nor evaluated. |
 
 Other languages (` ```bash `, ` ```output `) are left untouched.

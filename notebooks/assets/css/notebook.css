@@ -213,6 +213,94 @@ article.notebook { counter-reset: sidenote-counter; }
   .marginnote-toggle::before { content: "⊕ "; }
 }
 
+/* ── Hint callouts (<details><summary>) ── */
+
+article.notebook details {
+  max-width: var(--text-w);
+  margin: 1rem 0;
+  padding: 0.6rem 1rem;
+  border-left: 3px solid var(--rule);
+  background: #fbf6e8;
+  font-size: 1.1rem;
+  line-height: 1.55;
+}
+
+article.notebook details > summary {
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+  font-size: 0.95rem;
+  color: var(--accent);
+  cursor: pointer;
+  list-style: none;
+}
+article.notebook details > summary::-webkit-details-marker { display: none; }
+article.notebook details > summary::before {
+  content: "▸ ";
+  display: inline-block;
+  margin-right: 0.2em;
+  transition: transform 0.15s ease;
+}
+article.notebook details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+article.notebook details > p,
+article.notebook details > *:not(summary) {
+  font-size: 1.05rem;
+  margin-top: 0.6rem;
+}
+
+article.notebook details code {
+  background: #fff;
+}
+
+/* ── Figures (Graphviz-rendered SVGs) ── */
+
+article.notebook figure.kripke {
+  max-width: var(--text-w);
+  margin: 1.4rem 0;
+  text-align: center;
+  background: var(--paper);
+}
+
+article.notebook figure.kripke img {
+  max-width: 100%;
+  height: auto;
+}
+
+article.notebook figure.kripke figcaption {
+  font-size: 1rem;
+  color: var(--dim);
+  margin-top: 0.4rem;
+  font-style: italic;
+}
+
+/* ── Tables (Definition tables in the chapter) ── */
+
+article.notebook table {
+  max-width: var(--text-w);
+  margin: 1.4rem 0;
+  border-collapse: collapse;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+article.notebook th,
+article.notebook td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.4rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+article.notebook th {
+  font-variant: small-caps;
+  font-weight: normal;
+  color: var(--dim);
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--ink);
+}
+
 /* ── Footer ── */
 
 footer {
