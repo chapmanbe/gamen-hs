@@ -7,6 +7,7 @@ import Data.Set qualified as Set
 import Data.Map.Strict qualified as Map
 import Gamen.DeonticStit
 import Gamen.DeonticStit.Rules
+import Gamen.DeonticStit.Saturation
 import Gamen.DeonticStit.Sequent
 import Gamen.Epistemic
 import Gamen.Formula
@@ -472,6 +473,187 @@ main = hspec $ do
           Just RuleApp{ raPremises = ps, raFreshLabels = [] } ->
             length ps `shouldBe` 3   -- k(k+1)/2 = 3
           _ -> expectationFailure "applyAPC 2 should produce 3 premises on a 3-label sequent"
+
+  -- Saturation, generation tree, and blocking (issue #8 step E).
+  describe "DeonticStit.Saturation: GenTree" $ do
+    let w0 = label0
+        w1 = nextLabel w0
+        w2 = nextLabel w1
+
+    it "emptyGenTree has just the root" $ do
+      let gt = emptyGenTree w0
+      gtRoot gt   `shouldBe` w0
+      ancestors w0 gt `shouldBe` []
+
+    it "addGenChild records the parent edge" $ do
+      let gt = addGenChild w1 w2
+             $ addGenChild w0 w1
+             $ emptyGenTree w0
+      ancestors w2 gt `shouldBe` [w1, w0]
+      ancestors w1 gt `shouldBe` [w0]
+
+    it "addGenIoaLabel marks but does not parent" $ do
+      let gt = addGenIoaLabel w1 (emptyGenTree w0)
+      isIoaLabel w1 gt `shouldBe` True
+      ancestors  w1 gt `shouldBe` []     -- no edge in the tree
+
+  describe "DeonticStit.Saturation: blocking" $ do
+    let p   = Atom "p"
+        w0  = label0
+        w1  = nextLabel w0
+        w2  = nextLabel w1
+
+    it "directly blocks a child whose Γ↾u and ideals match the parent" $ do
+      let gt = addGenChild w0 w1 (emptyGenTree w0)
+          s  = addFormula (mkLabFormula w0 p)
+             $ addFormula (mkLabFormula w1 p)
+             $ emptySequent
+      -- Same formula content {p} at both labels, same (empty) ideals.
+      -- w1 is directly blocked by w0... but Definition 16 (i)
+      -- excludes the root as blocker. So w1 is NOT blocked.
+      isDirectlyBlockedBy w1 w0 gt s `shouldBe` False
+      isBlocked w1 gt s              `shouldBe` False
+
+    it "directly blocks when the ancestor is not the root" $ do
+      let gt = addGenChild w1 w2
+             $ addGenChild w0 w1
+             $ emptyGenTree w0
+          s  = addFormula (mkLabFormula w1 p)
+             $ addFormula (mkLabFormula w2 p)
+             $ emptySequent
+      -- w2's ancestor w1 is not the root and has the same Γ↾.
+      isDirectlyBlockedBy w2 w1 gt s `shouldBe` True
+      isBlocked w2 gt s              `shouldBe` True
+
+    it "differing formula content prevents blocking" $ do
+      let gt = addGenChild w1 w2
+             $ addGenChild w0 w1
+             $ emptyGenTree w0
+          s  = addFormula (mkLabFormula w1 p)
+             $ addFormula (mkLabFormula w2 (Not p))
+             $ emptySequent
+      isDirectlyBlockedBy w2 w1 gt s `shouldBe` False
+
+    it "IOA labels are never blocked" $ do
+      let gt = addGenIoaLabel w1 (emptyGenTree w0)
+      isBlocked w1 gt emptySequent `shouldBe` False
+
+  describe "DeonticStit.Saturation: saturation predicates" $ do
+    let p  = Atom "p"
+        np = Not (Atom "p")
+        q  = Atom "q"
+        w0 = label0
+        w1 = nextLabel w0
+        gt = emptyGenTree w0
+
+    it "satId fails on a closed sequent" $ do
+      let s = addFormula (mkLabFormula w0 p)
+            $ singletonSequent w0 np
+      satId s `shouldBe` False
+
+    it "satOr fails when a disjunct is missing" $ do
+      satOr (singletonSequent w0 (Or p q)) `shouldBe` False
+
+    it "satOr holds when both disjuncts are present" $ do
+      let s = addFormula (mkLabFormula w0 p)
+            $ addFormula (mkLabFormula w0 q)
+            $ singletonSequent w0 (Or p q)
+      satOr s `shouldBe` True
+
+    it "satAnd fails when both conjuncts are missing" $ do
+      satAnd (singletonSequent w0 (And p q)) `shouldBe` False
+
+    it "satAnd holds with one conjunct present (saturation, not the rule)" $ do
+      let s = addFormula (mkLabFormula w0 p)
+            $ singletonSequent w0 (And p q)
+      satAnd s `shouldBe` True
+
+    it "satDiamond requires some witness label" $ do
+      satDiamond (singletonSequent w0 (Diamond p)) `shouldBe` False
+      let s = addFormula (mkLabFormula w0 p)
+            $ singletonSequent w0 (Diamond p)
+      satDiamond s `shouldBe` True
+
+    it "satBox requires an unblocked witness" $ do
+      satBox gt (singletonSequent w0 (Box p)) `shouldBe` False
+      let s = addFormula (mkLabFormula w0 p)
+            $ singletonSequent w0 (Box p)
+      satBox gt s `shouldBe` True
+
+    it "satChoiceDiamond demands u:φ AND u:⟨i⟩φ when R_[i]wu present" $ do
+      let s0 = addRel (Choice "i" w0 w1)
+             $ singletonSequent w0 (ChoiceDiamond "i" p)
+      satChoiceDiamond s0 `shouldBe` False
+      let s1 = addFormula (mkLabFormula w1 p)
+             $ addFormula (mkLabFormula w1 (ChoiceDiamond "i" p)) s0
+      satChoiceDiamond s1 `shouldBe` True
+
+    it "satStit demands an R_[i]wu and u:φ for unblocked w" $ do
+      satStit gt (singletonSequent w0 (Stit "i" p)) `shouldBe` False
+
+    it "satRef demands R_[i]ww at every (i, w)" $ do
+      satRef (singletonSequent w0 (Stit "i" p)) `shouldBe` False
+      let s = addRel (Choice "i" w0 w0)
+            $ singletonSequent w0 (Stit "i" p)
+      satRef s `shouldBe` True
+
+    it "satEuc fails without Euclidean closure of R_[i]wu, R_[i]wv → R_[i]uv" $ do
+      -- R_[i]w0w0 and R_[i]w0w1 both present; Euclidean demands
+      -- R_[i]w0w1 (already there), R_[i]w1w0, and R_[i]w1w1.
+      let s = addRel (Choice "i" w0 w0)
+            $ addRel (Choice "i" w0 w1)
+            $ singletonSequent w0 (Stit "i" p)
+      satEuc s `shouldBe` False
+      let sClosed = addRel (Choice "i" w1 w0)
+                  $ addRel (Choice "i" w1 w1) s
+      satEuc sClosed `shouldBe` True
+
+    it "satPermitted demands u:φ at every Ideal-witness" $ do
+      let s = addRel (Ideal "i" w1)
+            $ singletonSequent w0 (Permitted "i" p)
+      satPermitted s `shouldBe` False
+
+    it "satOught requires unblocked I_⊗_i u with u:φ" $ do
+      satOught gt (singletonSequent w0 (Ought "i" p)) `shouldBe` False
+      let s = addRel (Ideal "i" w0)
+            $ addFormula (mkLabFormula w0 p)
+            $ singletonSequent w0 (Ought "i" p)
+      satOught gt s `shouldBe` True
+
+    it "satD2 demands every agent to have an unblocked ideal" $ do
+      satD2 gt (singletonSequent w0 (Ought "i" p)) `shouldBe` False
+      let s = addRel (Ideal "i" w0)
+            $ singletonSequent w0 (Ought "i" p)
+      satD2 gt s `shouldBe` True
+
+    it "satD3 demands ideal-set closure under R_[i]" $ do
+      let s0 = addRel (Ideal  "i" w0)
+             $ addRel (Choice "i" w0 w1)
+             $ singletonSequent w0 (Permitted "i" p)
+      satD3 s0 `shouldBe` False
+      let s1 = addRel (Ideal "i" w1) s0
+      satD3 s1 `shouldBe` True
+
+    it "satAPC k=0 always holds" $ do
+      satAPC 0 (singletonSequent w0 (Stit "i" p)) `shouldBe` True
+
+    it "satAPC k=1 fails when 2 labels exist with no R_[i] pair" $ do
+      let s = addFormula (mkLabFormula w1 p)
+            $ singletonSequent w0 (Stit "i" p)
+      satAPC 1 s `shouldBe` False
+
+  describe "DeonticStit.Saturation: isStable" $ do
+    let w0 = label0
+        gt = emptyGenTree w0
+
+    it "is False on any non-trivial sequent missing R_[i]ww" $ do
+      -- (Stit "i" p) at w0 needs Ref (R_[i]w0w0) plus a witness u
+      -- with R_[i]w0u and u:p — none of which we have.
+      isStable 0 gt (singletonSequent w0 (Stit "i" (Atom "p")))
+        `shouldBe` False
+
+    it "is True on the empty sequent" $ do
+      isStable 0 gt emptySequent `shouldBe` True
 
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]

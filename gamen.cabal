@@ -15,6 +15,7 @@ library
   exposed-modules:
     Gamen.DeonticStit
     Gamen.DeonticStit.Rules
+    Gamen.DeonticStit.Saturation
     Gamen.DeonticStit.Sequent
     Gamen.Doxastic
     Gamen.Epistemic
