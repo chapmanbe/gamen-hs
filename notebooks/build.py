@@ -52,10 +52,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Match fenced ```haskell blocks. Captures any attribute string after
-# the language token (e.g. " {.eval}").
+# Match plain fenced ```haskell blocks (no Pandoc-style attributes —
+# kramdown doesn't understand them and the syntax confuses GitHub's
+# raw-markdown viewer; see the README convention table).
 HASKELL_BLOCK_RE = re.compile(
-    r"^```haskell(?P<attrs>[^\n]*)\n(?P<code>.*?)\n```\s*$",
+    r"^```haskell\s*\n(?P<code>.*?)\n```\s*$",
     re.MULTILINE | re.DOTALL,
 )
 
@@ -72,20 +73,35 @@ def strip_outputs(text: str) -> str:
     """Remove every ```output``` block left behind by an earlier build."""
     return OUTPUT_BLOCK_RE.sub("", text)
 
-EVAL_ATTR_RE = re.compile(r"\beval\b")
-GHCI_ATTR_RE = re.compile(r"\bghci\b")
+
+# Marker comments authors use to tag a haskell block. They go on the
+# first line of the block as a Haskell-line-comment so they survive
+# any Markdown renderer (kramdown, GFM, Pandoc) untouched.
+EVAL_MARKER_RE = re.compile(r"^\s*--\s*:eval\b")
+GHCI_MARKER_RE = re.compile(r"^\s*--\s*:ghci\b")
 
 
-def is_eval(attrs: str) -> bool:
-    return bool(EVAL_ATTR_RE.search(attrs))
+def first_line(code: str) -> str:
+    return code.splitlines()[0] if code else ""
 
 
-def is_ghci(attrs: str) -> bool:
-    """A ``{.ghci}`` block is a GHCi directive (``:set``, ``:l``, ``:t``).
-    It's shown to the reader as Haskell-flavoured syntax but is *not*
-    valid Haskell source, so the build script neither accumulates nor
-    evaluates it."""
-    return bool(GHCI_ATTR_RE.search(attrs))
+def is_eval(code: str) -> bool:
+    return bool(EVAL_MARKER_RE.match(first_line(code)))
+
+
+def is_ghci(code: str) -> bool:
+    """A ``-- :ghci`` block contains GHCi directives (``:set``, ``:l``,
+    ``:t``). Shown to the reader as Haskell-flavoured syntax but
+    *not* valid Haskell source, so the build script neither
+    accumulates nor evaluates it."""
+    return bool(GHCI_MARKER_RE.match(first_line(code)))
+
+
+def strip_marker(code: str) -> str:
+    """Drop the leading ``-- :eval`` / ``-- :ghci`` marker line so the
+    body can be wrapped in ``main = print (...)`` cleanly."""
+    lines = code.splitlines()
+    return "\n".join(lines[1:])
 
 
 def _scrub_cabal_chatter(stderr: str) -> str:
@@ -138,7 +154,7 @@ def run_haskell(program: str, repo_root: Path) -> str:
 
 
 def process(text: str, repo_root: Path) -> tuple[str, str]:
-    """Walk the document, splicing outputs after each {.eval} block.
+    """Walk the document, splicing outputs after each ``-- :eval`` block.
 
     Returns the processed Markdown plus the concatenated source code
     suitable for ``:load`` in GHCi.
@@ -153,19 +169,19 @@ def process(text: str, repo_root: Path) -> tuple[str, str]:
         pieces.append(text[cursor : m.end()])
         cursor = m.end()
 
-        attrs = m.group("attrs")
         code = m.group("code")
 
-        if is_eval(attrs):
+        if is_eval(code):
+            body = strip_marker(code)
             program = "\n".join(accumulated)
             # Indent the eval block's body so Haskell's layout rule
             # treats it as the argument to ``print`` rather than a
             # new top-level binding.
-            indented = "\n".join("  " + ln for ln in code.splitlines())
+            indented = "\n".join("  " + ln for ln in body.splitlines())
             program += f"\n\nmain = print (\n{indented}\n  )\n"
             output = run_haskell(program, repo_root)
             pieces.append(f"\n\n```output\n{output}\n```")
-        elif is_ghci(attrs):
+        elif is_ghci(code):
             # GHCi-only directive — visible to the reader, but neither
             # part of the program context nor evaluated.
             pass

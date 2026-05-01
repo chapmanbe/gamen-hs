@@ -24,7 +24,8 @@ Modern GHCi accepts multi-line definitions when they're wrapped in
 `:{ ... :}` brackets. If you want to paste several lines without the
 brackets every time, turn on multi-line mode:
 
-```haskell {.ghci}
+```haskell
+-- :ghci
 :set +m
 ```
 
@@ -50,7 +51,8 @@ oneWorld = mkFrame ["w"] []
 
 We can ask which worlds are reachable from `w`:
 
-```haskell {.eval}
+```haskell
+-- :eval
 accessible oneWorld "w"
 ```
 
@@ -67,7 +69,8 @@ no atoms valuated and confirm:
 emptyModel = mkModel oneWorld []
 ```
 
-```haskell {.eval}
+```haskell
+-- :eval
 satisfies emptyModel "w" (Box (Atom "p"))
 ```
 
@@ -91,7 +94,8 @@ model11 = mkModel frame11
 
 Now we can evaluate any formula at any world. Does `□p` hold at `w1`?
 
-```haskell {.eval}
+```haskell
+-- :eval
 satisfies model11 "w1" (Box (Atom "p"))
 ```
 
@@ -101,7 +105,8 @@ False
 `p` holds at `w2` but not at `w3`, so `□p` is false at `w1` — the
 universal quantifier over successors fails on `w3`. What about `◇q`?
 
-```haskell {.eval}
+```haskell
+-- :eval
 satisfies model11 "w1" (Diamond (Atom "q"))
 ```
 
@@ -116,7 +121,8 @@ A more subtle question: does `□(p ∨ q)` hold at `w1`? Every
 successor of `w1` either has `p` or `q` (or both) — `w2` has both,
 `w3` has neither.
 
-```haskell {.eval}
+```haskell
+-- :eval
 satisfies model11 "w1" (Box (Or (Atom "p") (Atom "q")))
 ```
 
@@ -133,7 +139,8 @@ A formula with no modal operators is decided entirely by the
 valuation at the world in question — the accessibility relation
 plays no role. The library exposes this as `isModalFree`:
 
-```haskell {.eval}
+```haskell
+-- :eval
 isModalFree (And (Atom "p") (Not (Atom "q")))
 ```
 
@@ -142,7 +149,8 @@ True
 ```
 Compare with a formula that contains a `Box`:
 
-```haskell {.eval}
+```haskell
+-- :eval
 isModalFree (Box (Atom "p"))
 ```
 
