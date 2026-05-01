@@ -3,9 +3,11 @@ module Gamen.Semantics
   ( satisfies
   , isTrueIn
   , isValid
+  , isTautology
   , entails
   ) where
 
+import Data.Bits (testBit)
 import Data.Map.Strict qualified as Map
 import Data.Set qualified as Set
 
@@ -138,6 +140,29 @@ isTrueIn m f = all (\w -> satisfies m w f) (worlds (frame m))
 -- (Definition 1.11, B&D).
 isValid :: [Model] -> Formula -> Bool
 isValid models f = all (`isTrueIn` f) models
+
+-- | Is the formula a propositional tautology — true under every
+-- truth assignment to its atoms?
+--
+-- Enumerates all @2^n@ single-world models (one per assignment to
+-- the atoms appearing in the formula) and evaluates @isTrueIn@ at
+-- each. Modal operators in the formula see a world with no
+-- successors, so @Box phi@ is vacuously true everywhere and
+-- @Diamond phi@ is false; the check is genuinely *propositional*.
+-- For modal-validity questions, build explicit Kripke models and
+-- use 'isValid'.
+isTautology :: Formula -> Bool
+isTautology phi =
+    all (\k -> isTrueIn (modelFor k) phi) [0 .. cases - 1]
+  where
+    atomList = Set.toAscList (atoms phi)
+    n        = length atomList
+    cases    = 2 ^ n :: Int
+    modelFor k =
+      let trueAtoms = [(atomName a, ["w" :: World])
+                      | (a, i) <- zip atomList [0..]
+                      , testBit k i]
+      in mkModel (mkFrame ["w"] []) trueAtoms
 
 -- | Γ entails A in model M if: for every world w, if all premises
 -- hold at w then the conclusion holds at w (Definition 1.23, B&D).
