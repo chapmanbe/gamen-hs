@@ -6,6 +6,7 @@ import Data.Set qualified as Set
 
 import Data.Map.Strict qualified as Map
 import Gamen.DeonticStit
+import Gamen.DeonticStit.CounterModel
 import Gamen.DeonticStit.Prove
 import Gamen.DeonticStit.Rules
 import Gamen.DeonticStit.Saturation
@@ -724,6 +725,43 @@ main = hspec $ do
         Proved           -> expectationFailure "unexpected Proved"
         MaxStepsExceeded _ _ ->
           expectationFailure "loop-checking failed: maxSteps tripped"
+
+  -- Counter-model extraction (issue #8 step G).
+  describe "DeonticStit.CounterModel: extractDSModel" $ do
+    let p = Atom "p"
+
+    it "Box p is refuted; extracted model falsifies Box p at w0" $ do
+      let phi = Box p
+      case proveFormula 0 1000 phi of
+        Refuted gt s -> do
+          let m       = extractDSModel gt s
+              rootW   = show label0
+          Set.member rootW (dsWorlds (dsFrame m)) `shouldBe` True
+          dsSatisfies m rootW phi `shouldBe` False
+        _ -> expectationFailure "Box p should refute, not prove"
+
+    it "Stit i p is refuted; extracted model falsifies it at w0" $ do
+      let phi = Stit "i" p
+      case proveFormula 0 1000 phi of
+        Refuted gt s -> do
+          let m     = extractDSModel gt s
+              rootW = show label0
+          Set.member rootW (dsWorlds (dsFrame m)) `shouldBe` True
+          dsSatisfies m rootW phi `shouldBe` False
+        _ -> expectationFailure "Stit i p should refute"
+
+    it "Ought i p is refuted; extracted model has nonempty ideal" $ do
+      -- ⊗_i p alone is invalid. Counter-model should have at least
+      -- one ideal world for agent i (by D2 saturation enforcement).
+      let phi = Ought "i" p
+      case proveFormula 0 1000 phi of
+        Refuted gt s -> do
+          let m     = extractDSModel gt s
+              rootW = show label0
+          dsSatisfies m rootW phi `shouldBe` False
+          -- D2: every agent has a non-empty ideal.
+          isValidDSFrame (dsFrame m) `shouldBe` True
+        _ -> expectationFailure "Ought i p should refute"
 
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]

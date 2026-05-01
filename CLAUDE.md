@@ -35,6 +35,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 | `Gamen.DeonticStit.Rules` | Lyon & van Berkel 2024 | In progress | Bottom-up inference rules for G3DS^k_n (closure, logical, frame, APC) |
 | `Gamen.DeonticStit.Saturation` | Lyon & van Berkel 2024 | In progress | Generation tree, blocking, and 14 saturation predicates from Definition 18 |
 | `Gamen.DeonticStit.Prove` | Lyon & van Berkel 2024 | In progress | Three-phase Algorithm 1 driver; proves K axiom, Ought-implies-Can, terminates on §4.1 counterexample |
+| `Gamen.DeonticStit.CounterModel` | Lyon & van Berkel 2024 | In progress | Stability-model extraction (Definition 20) — turns a Refuted sequent into a falsifying DSModel |
 | `Gamen.Xstit` | Broersen 2011 | Done | Epistemic deontic XSTIT: mens rea, violation constants |
 
 ## Build System
@@ -42,7 +43,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (307 tests)
+- `cabal test --enable-tests` — run tests (310 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
