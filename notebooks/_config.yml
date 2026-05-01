@@ -1,0 +1,33 @@
+title: "gamen-hs notebooks"
+description: "Pedagogical chapters for the gamen-hs modal logic library"
+
+# Built into the Pages site at /notebooks/ alongside the Haddock
+# documentation served from the project root.
+baseurl: "/gamen-hs/notebooks"
+
+markdown: kramdown
+kramdown:
+  syntax_highlighter: rouge
+  syntax_highlighter_opts:
+    css_class: highlight
+    block:
+      line_numbers: false
+
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "notebook"
+
+# Skip the build/ directory's auto-discovery in case Jekyll trips
+# over the sidecar .hs files; they're not pages.
+exclude:
+  - build.py
+  - build/*.hs
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+
+plugins: []

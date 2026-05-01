@@ -1,0 +1,7 @@
+{% comment %}
+Numbered sidenote, mirroring chapmanbe.github.io/_includes/sidenote.html.
+Usage: {% include sidenote.html id="unique-id" content="Sidenote text." %}
+{% endcomment %}
+<label for="{{ include.id }}" class="sidenote-ref"></label>
+<input type="checkbox" id="{{ include.id }}" class="sidenote-toggle" />
+<span class="sidenote">{{ include.content }}</span>

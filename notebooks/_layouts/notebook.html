@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ page.title }} — gamen-hs notebooks</title>
+
+<link rel="stylesheet" href="https://edwardtufte.github.io/tufte-css/et-book/et-book.css">
+<link rel="stylesheet" href="{{ site.baseurl }}/assets/css/notebook.css">
+</head>
+<body>
+
+<header class="masthead">
+  <a href="{{ site.baseurl }}/" class="site-title">gamen-hs notebooks</a>
+  <nav>
+    <a href="{{ site.baseurl }}/">all chapters</a> ·
+    <a href="../">haddock</a> ·
+    <a href="https://github.com/chapmanbe/gamen-hs">repo</a>
+  </nav>
+</header>
+
+<article class="notebook">
+  {% if page.title %}<h1 class="page__title">{{ page.title }}</h1>{% endif %}
+  {{ content }}
+</article>
+
+<footer>
+  <hr>
+  <p>chapter {{ page.chapter | default: "" }} of <a href="{{ site.baseurl }}/">gamen-hs notebooks</a> ·
+  <a href="https://github.com/chapmanbe/gamen-hs/blob/main/notebooks/{{ page.path }}">edit on GitHub</a></p>
+</footer>
+
+</body>
+</html>

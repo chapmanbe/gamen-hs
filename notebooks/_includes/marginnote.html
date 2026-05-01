@@ -1,0 +1,7 @@
+{% comment %}
+Unnumbered margin note, mirroring chapmanbe.github.io/_includes/marginnote.html.
+Usage: {% include marginnote.html id="unique-id" content="Margin note text." %}
+{% endcomment %}
+<label for="{{ include.id }}" class="marginnote-toggle">⊕</label>
+<input type="checkbox" id="{{ include.id }}" class="marginnote-toggle" />
+<span class="marginnote">{{ include.content }}</span>
