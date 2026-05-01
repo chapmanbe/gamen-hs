@@ -165,7 +165,14 @@ article.notebook .language-output::before {
   color: var(--accent);
   cursor: pointer;
 }
-.sidenote-toggle { display: none; }
+
+/* Default (wide-screen) state: the toggles are completely hidden.
+ * The marginnote/sidenote spans float into the right margin, no
+ * toggle UI is needed because the notes are already visible. Both
+ * the <label class="…-toggle"> and the <input class="…-toggle">
+ * carry the same class, so a single rule hides both. */
+.sidenote-toggle,
+.marginnote-toggle { display: none; }
 
 .sidenote, .marginnote {
   float: right;
@@ -186,16 +193,12 @@ article.notebook .language-output::before {
   color: var(--accent);
 }
 
-.marginnote-toggle {
-  cursor: pointer;
-  color: var(--accent);
-  font-size: 0.85em;
-}
-
 article.notebook { counter-reset: sidenote-counter; }
 
-/* On narrow screens the margin column collapses; sidenotes become
- * inline blockquote-style asides triggered by the checkbox. */
+/* On narrow screens the margin column collapses. The notes are
+ * collapsed to ``display: none`` and the toggles become visible
+ * inline buttons; clicking the label flips the (still-hidden)
+ * checkbox, and the ``:checked ~`` selector reveals the note. */
 @media (max-width: 1100px) {
   .sidenote, .marginnote {
     display: none;
@@ -206,11 +209,23 @@ article.notebook { counter-reset: sidenote-counter; }
     border-left: 3px solid var(--rule);
     background: #faf6e8;
   }
-  .sidenote-toggle:checked + .sidenote,
-  .marginnote-toggle + input.marginnote-toggle:checked + .marginnote {
+
+  /* Show the marginnote label as an inline clickable affordance.
+   * (The sidenote label has class ``sidenote-ref`` — a different
+   * class — and is already a numbered superscript via ::after, so
+   * it stays visible across both screen widths.) */
+  label.marginnote-toggle {
+    display: inline;
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 0.85em;
+  }
+  input.marginnote-toggle { display: none; }
+
+  .sidenote-toggle:checked ~ .sidenote,
+  .marginnote-toggle:checked ~ .marginnote {
     display: block;
   }
-  .marginnote-toggle::before { content: "⊕ "; }
 }
 
 /* ── Hint callouts (<details><summary>) ── */
