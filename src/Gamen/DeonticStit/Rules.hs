@@ -33,6 +33,8 @@ module Gamen.DeonticStit.Rules
   ( -- * Rule application result
     RuleApp (..)
   , Rule
+  , nonGenApp
+  , freshApp
     -- * Closure
   , isClosedSequent
     -- * Propositional logical rules
@@ -71,12 +73,23 @@ import Gamen.DeonticStit.Sequent
 --
 -- @raPremises@ contains one or more sequents whose joint provability
 -- entails the conclusion's provability. A two-element list denotes a
--- branching rule like (∧) or (∧)-style instances of (APC). Generating
--- rules record the new labels they introduced in @raFreshLabels@ so
--- the driver can wire them into the generation tree (issue #8 step E).
+-- branching rule like (∧) or (∧)-style instances of (APC).
+--
+-- Generating rules record introduced labels in @raFreshLabels@ and,
+-- for tree-node labels, their corresponding parent in @raParents@
+-- (zipped one-to-one with @raFreshLabels@). The proof-search driver
+-- in step F adds @(parent, child)@ edges to the generation tree from
+-- this list, which it consults when checking the blocking
+-- saturation conditions.
+--
+-- IoaOp-introduced labels (the @(IOA)@ rule from Definition 11) are
+-- recorded separately in @raIoaLabels@ since per Remark 17 they are
+-- /not/ tree nodes and live in the gen-tree's @gtIoaSet@.
 data RuleApp = RuleApp
   { raPremises    :: [Sequent]
   , raFreshLabels :: [Label]
+  , raParents     :: [Label]
+  , raIoaLabels   :: [Label]
   }
   deriving (Eq, Show)
 
@@ -84,6 +97,16 @@ data RuleApp = RuleApp
 -- formula or relational pattern and produces premises. Returns
 -- 'Nothing' when saturated.
 type Rule = Sequent -> Maybe RuleApp
+
+-- | A non-generating rule application: only premises, no fresh
+-- labels and no gen-tree edges.
+nonGenApp :: [Sequent] -> RuleApp
+nonGenApp ps = RuleApp ps [] [] []
+
+-- | A single-fresh-label rule application. The fresh @child@ is
+-- parented by @parent@ in the generation tree.
+freshApp :: [Sequent] -> Label -> Label -> RuleApp
+freshApp ps parent child = RuleApp ps [child] [parent] []
 
 -- ====================================================================
 -- (id) — closure
@@ -113,14 +136,14 @@ applyAnd s = case findFirst conjCandidate (gamma s) of
   Just (w, l, r) ->
     let leftPremise  = addFormula (LabFormula w l) s
         rightPremise = addFormula (LabFormula w r) s
-    in Just RuleApp
-         { raPremises    = [leftPremise, rightPremise]
-         , raFreshLabels = []
-         }
+    in Just (nonGenApp [leftPremise, rightPremise])
   where
+    -- Algorithm 1, line 24: fires only when /neither/ conjunct is in
+    -- Γ. Firing whenever one is missing would branch into a copy of
+    -- the input on one side, looping the driver.
     conjCandidate (LabFormula w (And l r))
-      | not (Set.member (LabFormula w l) (gamma s))
-        || not (Set.member (LabFormula w r) (gamma s))
+      | Set.notMember (LabFormula w l) (gamma s)
+        && Set.notMember (LabFormula w r) (gamma s)
         = Just (w, l, r)
     conjCandidate _ = Nothing
 
@@ -136,10 +159,7 @@ applyOr s = case findFirst disjCandidate (gamma s) of
   Just (w, l, r) ->
     let s' = addFormula (LabFormula w l)
            $ addFormula (LabFormula w r) s
-    in Just RuleApp
-         { raPremises    = [s']
-         , raFreshLabels = []
-         }
+    in Just (nonGenApp [s'])
   where
     disjCandidate (LabFormula w (Or l r))
       | not (Set.member (LabFormula w l) (gamma s))
@@ -160,10 +180,7 @@ applyDiamond s =
       Nothing -> Nothing
       Just (u, phi) ->
         let s' = addFormula (LabFormula u phi) s
-        in Just RuleApp
-             { raPremises    = [s']
-             , raFreshLabels = []
-             }
+        in Just (nonGenApp [s'])
   where
     allLabels = labels s
     candidate (LabFormula _ (Diamond phi)) =
@@ -188,10 +205,7 @@ applyChoiceDiamond s =
       Just (u, agent, phi) ->
         let s' = addFormula (LabFormula u phi)
                $ addFormula (LabFormula u (ChoiceDiamond agent phi)) s
-        in Just RuleApp
-             { raPremises    = [s']
-             , raFreshLabels = []
-             }
+        in Just (nonGenApp [s'])
   where
     candidate (LabFormula w (ChoiceDiamond agent phi)) =
       lookupOne
@@ -216,10 +230,7 @@ applyPermitted s =
       Nothing -> Nothing
       Just (u, phi) ->
         let s' = addFormula (LabFormula u phi) s
-        in Just RuleApp
-             { raPremises    = [s']
-             , raFreshLabels = []
-             }
+        in Just (nonGenApp [s'])
   where
     candidate (LabFormula _ (Permitted agent phi)) =
       lookupOne
@@ -242,15 +253,15 @@ applyPermitted s =
 applyBox :: Rule
 applyBox s = case lookupOne candidate (Set.toList (gamma s)) of
   Nothing -> Nothing
-  Just phi ->
+  Just (w, phi) ->
     let fresh = freshLabel s
         s'    = addFormula (LabFormula fresh phi) s
-    in Just RuleApp { raPremises = [s'], raFreshLabels = [fresh] }
+    in Just (freshApp [s'] w fresh)
   where
-    candidate (LabFormula _ (Box phi))
+    candidate (LabFormula w (Box phi))
       | not (any (\u -> Set.member (LabFormula u phi) (gamma s))
                  (Set.toList (labels s)))
-      = Just phi
+      = Just (w, phi)
     candidate _ = Nothing
 
 -- ====================================================================
@@ -269,7 +280,7 @@ applyStit s = case lookupOne candidate (Set.toList (gamma s)) of
     let fresh = freshLabel s
         s'    = addRel (Choice agent w fresh)
               $ addFormula (LabFormula fresh phi) s
-    in Just RuleApp { raPremises = [s'], raFreshLabels = [fresh] }
+    in Just (freshApp [s'] w fresh)
   where
     candidate (LabFormula w (Stit agent phi))
       | not (any (\u -> hasRel (Choice agent w u) s
@@ -288,17 +299,17 @@ applyStit s = case lookupOne candidate (Set.toList (gamma s)) of
 applyOught :: Rule
 applyOught s = case lookupOne candidate (Set.toList (gamma s)) of
   Nothing -> Nothing
-  Just (agent, phi) ->
+  Just (w, agent, phi) ->
     let fresh = freshLabel s
         s'    = addRel (Ideal agent fresh)
               $ addFormula (LabFormula fresh phi) s
-    in Just RuleApp { raPremises = [s'], raFreshLabels = [fresh] }
+    in Just (freshApp [s'] w fresh)
   where
-    candidate (LabFormula _ (Ought agent phi))
+    candidate (LabFormula w (Ought agent phi))
       | not (any (\u -> hasRel (Ideal agent u) s
                      && Set.member (LabFormula u phi) (gamma s))
                  (Set.toList (labels s)))
-      = Just (agent, phi)
+      = Just (w, agent, phi)
     candidate _ = Nothing
 
 -- ====================================================================
@@ -315,9 +326,7 @@ applyRef s = lookupOne firstNeeded
   where
     firstNeeded (a, w)
       | not (hasRel (Choice a w w) s)
-      = Just RuleApp { raPremises    = [addRel (Choice a w w) s]
-                     , raFreshLabels = []
-                     }
+      = Just (nonGenApp [addRel (Choice a w w) s])
       | otherwise = Nothing
 
 -- | Euc_i rule: each @R_[i]@ is Euclidean (Algorithm 1, lines 8–10).
@@ -337,9 +346,7 @@ applyEuc s =
   where
     firstNeeded (a, u, v)
       | not (hasRel (Choice a u v) s)
-      = Just RuleApp { raPremises    = [addRel (Choice a u v) s]
-                     , raFreshLabels = []
-                     }
+      = Just (nonGenApp [addRel (Choice a u v) s])
       | otherwise = Nothing
 
 -- | D3_i rule: ideal sets are closed under @R_[i]@ (Algorithm 1,
@@ -358,9 +365,7 @@ applyD3 s =
   where
     firstNeeded (a, u)
       | not (hasRel (Ideal a u) s)
-      = Just RuleApp { raPremises    = [addRel (Ideal a u) s]
-                     , raFreshLabels = []
-                     }
+      = Just (nonGenApp [addRel (Ideal a u) s])
       | otherwise = Nothing
 
 -- ====================================================================
@@ -369,17 +374,19 @@ applyD3 s =
 
 -- | D2_i rule: for any agent with no @I_⊗_i u@ in ℛ, introduce a
 -- fresh @v@ with @I_⊗_i v@ (Algorithm 1, lines 48–50).
-applyD2 :: Rule
-applyD2 s =
+--
+-- The fresh label is parented under the gen-tree root @rootLabel@
+-- (the input formula's label, conventionally @w_0@), per Note 4 of
+-- Definition 14.
+applyD2 :: Label -> Rule
+applyD2 rootLabel s =
     lookupOne firstNeedy (Set.toList (sequentAgents s))
   where
     firstNeedy a
       | not (any (\u -> hasRel (Ideal a u) s) (Set.toList (labels s)))
       = let fresh = freshLabel s
             s'    = addRel (Ideal a fresh) s
-        in Just RuleApp { raPremises    = [s']
-                        , raFreshLabels = [fresh]
-                        }
+        in Just (freshApp [s'] rootLabel fresh)
       | otherwise = Nothing
 
 -- ====================================================================
@@ -411,14 +418,11 @@ applyAPC k s =
     tryBranch a tuple
       | all (\(j, m) -> not (hasRel (Choice a (tuple !! j) (tuple !! m)) s))
             [(j, m) | j <- [0 .. k], m <- [0 .. k], j /= m]
-      = Just RuleApp
-          { raPremises =
-              [ addRel (Choice a (tuple !! m) (tuple !! j)) s
-              | m <- [0 .. k - 1]
-              , j <- [m + 1 .. k]
-              ]
-          , raFreshLabels = []
-          }
+      = Just (nonGenApp
+          [ addRel (Choice a (tuple !! m) (tuple !! j)) s
+          | m <- [0 .. k - 1]
+          , j <- [m + 1 .. k]
+          ])
       | otherwise = Nothing
 
 -- | All ordered @(k+1)@-tuples of distinct labels drawn from a list.

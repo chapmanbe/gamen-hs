@@ -14,6 +14,7 @@ build-type:      Simple
 library
   exposed-modules:
     Gamen.DeonticStit
+    Gamen.DeonticStit.Prove
     Gamen.DeonticStit.Rules
     Gamen.DeonticStit.Saturation
     Gamen.DeonticStit.Sequent

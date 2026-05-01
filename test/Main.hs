@@ -6,6 +6,7 @@ import Data.Set qualified as Set
 
 import Data.Map.Strict qualified as Map
 import Gamen.DeonticStit
+import Gamen.DeonticStit.Prove
 import Gamen.DeonticStit.Rules
 import Gamen.DeonticStit.Saturation
 import Gamen.DeonticStit.Sequent
@@ -439,15 +440,16 @@ main = hspec $ do
     describe "applyD2 (D2_i rule)" $ do
       it "introduces a fresh I_⊗_i v when no ideal exists for agent i" $ do
         let s = singletonSequent w0 (Ought "i" p)
-        case applyD2 s of
-          Just RuleApp{ raPremises = [s'], raFreshLabels = [v] } ->
+        case applyD2 w0 s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [v], raParents = [pa] } -> do
             hasRel (Ideal "i" v) s' `shouldBe` True
-          _ -> expectationFailure "applyD2 should fire and yield 1 fresh label"
+            pa                       `shouldBe` w0
+          _ -> expectationFailure "applyD2 should fire and yield 1 fresh label parented at root"
 
       it "is Nothing when every agent already has an ideal world" $ do
         let s = addRel (Ideal "i" w0)
               $ singletonSequent w0 (Ought "i" p)
-        applyD2 s `shouldBe` Nothing
+        applyD2 w0 s `shouldBe` Nothing
 
     describe "applyAPC (APC^k_i, limited choice)" $ do
       it "k=0 disables the rule" $ do
@@ -654,6 +656,74 @@ main = hspec $ do
 
     it "is True on the empty sequent" $ do
       isStable 0 gt emptySequent `shouldBe` True
+
+  -- Proof-search driver (issue #8 step F). proveFormula closes when
+  -- the input is valid in DS^k_n; otherwise saturates and returns
+  -- Refuted with the data needed for counter-model extraction.
+  describe "DeonticStit.Prove: proveFormula" $ do
+    let p = Atom "p"
+        q = Atom "q"
+        proves f = isFormulaValid 0 1000 f
+        sat    f = isFormulaSatisfiable 0 1000 f
+
+    it "proves the propositional tautology p ∨ ¬p" $ do
+      proves (Or p (Not p)) `shouldBe` True
+
+    it "proves p → p" $ do
+      proves (Implies p p) `shouldBe` True
+
+    it "refutes the propositional non-tautology p ∧ ¬p" $ do
+      proves (And p (Not p)) `shouldBe` False
+
+    it "p ∧ ¬p is unsatisfiable" $ do
+      sat (And p (Not p)) `shouldBe` False
+
+    it "p ∧ q is satisfiable" $ do
+      sat (And p q) `shouldBe` True
+
+    it "isFormulaSetConsistent rejects {p, ¬p}" $ do
+      isFormulaSetConsistent 0 1000 [p, Not p] `shouldBe` False
+
+    it "isFormulaSetConsistent accepts {p, q}" $ do
+      isFormulaSetConsistent 0 1000 [p, q] `shouldBe` True
+
+    it "proves Box (p ∨ ¬p)" $ do
+      proves (Box (Or p (Not p))) `shouldBe` True
+
+    it "proves Box p → Box p" $ do
+      proves (Implies (Box p) (Box p)) `shouldBe` True
+
+    it "proves ◇p ∨ □¬p" $ do
+      -- Either some world has p, or every world has ¬p — a K-tautology.
+      proves (Or (Diamond p) (Box (Not p))) `shouldBe` True
+
+    it "proves □(p ∧ q) → □p" $ do
+      -- Box-distribution over conjunction.
+      proves (Implies (Box (And p q)) (Box p)) `shouldBe` True
+
+    it "proves the K axiom □(p → q) → (□p → □q)" $ do
+      proves (Implies (Box (Implies p q)) (Implies (Box p) (Box q)))
+        `shouldBe` True
+
+    it "proves Lyon-Berkel Example 5: ⊗_i p → ◇[i]p ∨ ⊖_i ¬p" $ do
+      -- Ought-implies-can (Lyon-Berkel p. 847). If i ought to see to
+      -- p, then either there is some possible choice in which i sees
+      -- to p or i is permitted not to see to p.
+      let phi = Implies (Ought "i" p)
+                        (Or (Diamond (Stit "i" p)) (Permitted "i" (Not p)))
+      proves phi `shouldBe` True
+
+    it "terminates on the §4.1 counterexample ◇[1]p ∨ ◇[2]q" $ do
+      -- The non-deontic counterexample from p. 865, used to motivate
+      -- loop-checking. Should NOT MaxStepsExceed; must Refute (the
+      -- formula isn't valid) — invalid because there's no relation
+      -- forcing the disjunction to hold.
+      let phi = Or (ChoiceDiamond "1" p) (ChoiceDiamond "2" q)
+      case proveFormula 0 5000 phi of
+        Refuted _ _      -> True `shouldBe` True
+        Proved           -> expectationFailure "unexpected Proved"
+        MaxStepsExceeded _ _ ->
+          expectationFailure "loop-checking failed: maxSteps tripped"
 
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]

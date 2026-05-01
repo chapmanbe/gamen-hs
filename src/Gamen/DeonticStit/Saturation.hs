@@ -187,12 +187,15 @@ satAnd s = all check (Set.toList (gamma s))
       hasFormula (LabFormula w l) s || hasFormula (LabFormula w r) s
     check _ = True
 
--- | (C_◇) — every @w:◇φ@ has some @u:φ@ for @u ∈ Lab(Λ)@.
+-- | (C_◇) — every @w:◇φ ∈ Γ@ forces @u:φ ∈ Γ@ /for every/ @u ∈ Lab(Λ)@
+-- (Definition 18). The bound is universal because the calculus's (◇)
+-- rule iterates over labels: saturation means we have exhausted every
+-- candidate witness, not merely produced one.
 satDiamond :: Sequent -> Bool
 satDiamond s = all check (Set.toList (gamma s))
   where
     check (LabFormula _ (Diamond phi)) =
-      any (\u -> hasFormula (LabFormula u phi) s) (Set.toList (labels s))
+      all (\u -> hasFormula (LabFormula u phi) s) (Set.toList (labels s))
     check _ = True
 
 -- | (C_□) — every @w:□φ@ has an /unblocked/ @u@ with @u:φ ∈ Γ@.
