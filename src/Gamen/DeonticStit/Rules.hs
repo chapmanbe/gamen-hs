@@ -12,21 +12,23 @@
 -- the premise sequents and any fresh labels introduced (so the
 -- driver in Step F can record them in the generation tree).
 --
--- Issue #8 step D — only the rule mechanics are defined here. The
--- saturation conditions, generation tree, blocking, and proof-search
--- driver come in steps E and F. The rules in this commit cover the
--- closure rule, the propositional logical rules, and the
--- non-generating logical rules from Algorithm 1 (lines 21–40):
+-- Issue #8 step D — rule mechanics. The saturation conditions,
+-- generation tree, blocking, and proof-search driver come in steps E
+-- and F. Coverage:
 --
 -- * 'isClosedSequent' — encodes (id)
--- * 'applyAnd' — (∧) branches into two premises
--- * 'applyOr' — (∨) one premise, both disjuncts added
--- * 'applyDiamond' — (◇) one premise, picks an existing label
--- * 'applyChoiceDiamond' — (⟨i⟩) one premise, requires R_[i]wu
--- * 'applyPermitted' — (⊖_i) one premise, requires I_⊗_i u
+-- * Logical, non-generating: 'applyAnd' (∧, two premises),
+--   'applyOr' (∨), 'applyDiamond' (◇), 'applyChoiceDiamond' (⟨i⟩),
+--   'applyPermitted' (⊖_i)
+-- * Logical, generating: 'applyBox' (□), 'applyStit' ([i]),
+--   'applyOught' (⊗_i)
+-- * Frame rules, non-generating: 'applyRef' (Ref_i), 'applyEuc'
+--   (Euc_i), 'applyD3' (D3_i)
+-- * Frame rules, generating: 'applyD2' (D2_i)
+-- * Branching frame rule: 'applyAPC' (APC^k_i, only when k > 0)
 --
--- Generating rules (□, [i], ⊗_i, D2_i) and the frame rules
--- (Ref_i, Euc_i, D3_i, IOA, APC^k_i) land in a follow-up commit.
+-- The (IOA) rule is orchestrated via IoaOp (Definition 11) which
+-- requires gen-tree IOA-label tracking and lands with step E.
 module Gamen.DeonticStit.Rules
   ( -- * Rule application result
     RuleApp (..)
@@ -40,6 +42,20 @@ module Gamen.DeonticStit.Rules
   , applyDiamond
   , applyChoiceDiamond
   , applyPermitted
+    -- * Generating modal logical rules
+  , applyBox
+  , applyStit
+  , applyOught
+    -- * Non-generating frame rules
+  , applyRef
+  , applyEuc
+  , applyD3
+    -- * Generating frame rule
+  , applyD2
+    -- * Branching frame rule (limited choice)
+  , applyAPC
+    -- * Helpers
+  , sequentAgents
   ) where
 
 import Data.Set qualified as Set
@@ -215,8 +231,251 @@ applyPermitted s =
     candidate _ = Nothing
 
 -- ====================================================================
+-- (□) — necessity (generating)
+-- ====================================================================
+
+-- | (□) rule. From @w:□φ@ in Γ, when no existing label has @φ@ in Γ,
+-- introduce a fresh label @v@ and add @v:φ@ (Algorithm 1, lines
+-- 41–43; we omit the (□*) label-relabel optimisation for now). The
+-- principal @w:□φ@ is preserved; saturation is reached once at least
+-- one label has @φ@.
+applyBox :: Rule
+applyBox s = case lookupOne candidate (Set.toList (gamma s)) of
+  Nothing -> Nothing
+  Just phi ->
+    let fresh = freshLabel s
+        s'    = addFormula (LabFormula fresh phi) s
+    in Just RuleApp { raPremises = [s'], raFreshLabels = [fresh] }
+  where
+    candidate (LabFormula _ (Box phi))
+      | not (any (\u -> Set.member (LabFormula u phi) (gamma s))
+                 (Set.toList (labels s)))
+      = Just phi
+    candidate _ = Nothing
+
+-- ====================================================================
+-- ([i]) — choice box (generating)
+-- ====================================================================
+
+-- | ([i]) rule. From @w:[i]φ@ in Γ, when no existing @u@ with
+-- @R_[i]wu@ has @u:φ@ in Γ, introduce a fresh @v@, add the relational
+-- atom @R_[i]wv@, and add @v:φ@ (Algorithm 1, lines 51–54 — the
+-- non-IOA-label case; the IOA-label optimisation in lines 55–57 lands
+-- with step E).
+applyStit :: Rule
+applyStit s = case lookupOne candidate (Set.toList (gamma s)) of
+  Nothing -> Nothing
+  Just (w, agent, phi) ->
+    let fresh = freshLabel s
+        s'    = addRel (Choice agent w fresh)
+              $ addFormula (LabFormula fresh phi) s
+    in Just RuleApp { raPremises = [s'], raFreshLabels = [fresh] }
+  where
+    candidate (LabFormula w (Stit agent phi))
+      | not (any (\u -> hasRel (Choice agent w u) s
+                     && Set.member (LabFormula u phi) (gamma s))
+                 (Set.toList (labels s)))
+      = Just (w, agent, phi)
+    candidate _ = Nothing
+
+-- ====================================================================
+-- (⊗_i) — ought (generating)
+-- ====================================================================
+
+-- | (⊗_i) rule. From @w:⊗_i φ@ in Γ, when no existing @u@ with
+-- @I_⊗_i u@ has @u:φ@ in Γ, introduce a fresh @v@, add the deontic
+-- predicate @I_⊗_i v@, and add @v:φ@ (Algorithm 1, lines 44–47).
+applyOught :: Rule
+applyOught s = case lookupOne candidate (Set.toList (gamma s)) of
+  Nothing -> Nothing
+  Just (agent, phi) ->
+    let fresh = freshLabel s
+        s'    = addRel (Ideal agent fresh)
+              $ addFormula (LabFormula fresh phi) s
+    in Just RuleApp { raPremises = [s'], raFreshLabels = [fresh] }
+  where
+    candidate (LabFormula _ (Ought agent phi))
+      | not (any (\u -> hasRel (Ideal agent u) s
+                     && Set.member (LabFormula u phi) (gamma s))
+                 (Set.toList (labels s)))
+      = Just (agent, phi)
+    candidate _ = Nothing
+
+-- ====================================================================
+-- Frame rules: Ref_i, Euc_i, D3_i (non-generating)
+-- ====================================================================
+
+-- | Ref_i rule: each @R_[i]@ is reflexive on every label
+-- (Algorithm 1, lines 5–7). Adds @R_[i]ww@ for the first @(i, w)@
+-- pair lacking it.
+applyRef :: Rule
+applyRef s = lookupOne firstNeeded
+                       [(a, w) | a <- Set.toList (sequentAgents s)
+                               , w <- Set.toList (labels s)]
+  where
+    firstNeeded (a, w)
+      | not (hasRel (Choice a w w) s)
+      = Just RuleApp { raPremises    = [addRel (Choice a w w) s]
+                     , raFreshLabels = []
+                     }
+      | otherwise = Nothing
+
+-- | Euc_i rule: each @R_[i]@ is Euclidean (Algorithm 1, lines 8–10).
+-- Together with Ref_i this yields equivalence (Lemma 21). Given
+-- @R_[i]wu@ and @R_[i]wv@ in ℛ, add @R_[i]uv@ if missing.
+applyEuc :: Rule
+applyEuc s =
+    lookupOne firstNeeded
+              [ (a, u, v)
+              | a <- Set.toList (sequentAgents s)
+              , w <- Set.toList (labels s)
+              , u <- Set.toList (labels s)
+              , v <- Set.toList (labels s)
+              , hasRel (Choice a w u) s
+              , hasRel (Choice a w v) s
+              ]
+  where
+    firstNeeded (a, u, v)
+      | not (hasRel (Choice a u v) s)
+      = Just RuleApp { raPremises    = [addRel (Choice a u v) s]
+                     , raFreshLabels = []
+                     }
+      | otherwise = Nothing
+
+-- | D3_i rule: ideal sets are closed under @R_[i]@ (Algorithm 1,
+-- lines 11–13). Given @I_⊗_i w@ and @R_[i]wu@ in ℛ, add @I_⊗_i u@
+-- if missing.
+applyD3 :: Rule
+applyD3 s =
+    lookupOne firstNeeded
+              [ (a, u)
+              | a <- Set.toList (sequentAgents s)
+              , w <- Set.toList (labels s)
+              , u <- Set.toList (labels s)
+              , hasRel (Ideal a w) s
+              , hasRel (Choice a w u) s
+              ]
+  where
+    firstNeeded (a, u)
+      | not (hasRel (Ideal a u) s)
+      = Just RuleApp { raPremises    = [addRel (Ideal a u) s]
+                     , raFreshLabels = []
+                     }
+      | otherwise = Nothing
+
+-- ====================================================================
+-- D2_i — every agent has at least one ideal world (generating)
+-- ====================================================================
+
+-- | D2_i rule: for any agent with no @I_⊗_i u@ in ℛ, introduce a
+-- fresh @v@ with @I_⊗_i v@ (Algorithm 1, lines 48–50).
+applyD2 :: Rule
+applyD2 s =
+    lookupOne firstNeedy (Set.toList (sequentAgents s))
+  where
+    firstNeedy a
+      | not (any (\u -> hasRel (Ideal a u) s) (Set.toList (labels s)))
+      = let fresh = freshLabel s
+            s'    = addRel (Ideal a fresh) s
+        in Just RuleApp { raPremises    = [s']
+                        , raFreshLabels = [fresh]
+                        }
+      | otherwise = Nothing
+
+-- ====================================================================
+-- APC^k_i — limited choice (branching, k > 0 only)
+-- ====================================================================
+
+-- | APC^k_i rule (Lyon-Berkel Figure 2; Algorithm 1, lines 14–19).
+-- When @k > 0@, search for a tuple of @k + 1@ labels @(w_0, …, w_k)@
+-- with /no/ @R_[i]w_jw_m@ in ℛ for any @j ≠ m@. If found, branch on
+-- the @k(k+1)/2@ ways to pick a single pair @(m, j)@ with
+-- @0 ≤ m < j ≤ k@ and add @R_[i]w_m w_j@. The rule succeeds iff
+-- every branch closes, mirroring the (∧) interpretation of multiple
+-- premises.
+--
+-- @k = 0@ disables the rule (no upper bound on choices), and
+-- 'applyAPC 0' always returns 'Nothing'.
+applyAPC :: Int -> Rule
+applyAPC 0 _ = Nothing
+applyAPC k s =
+    let labelList = Set.toList (labels s)
+        agents    = Set.toList (sequentAgents s)
+    in lookupOne (firstUnsaturated labelList) agents
+  where
+    firstUnsaturated lbls a =
+      lookupOne (\tuple -> tryBranch a tuple) (kPlus1Tuples k lbls)
+
+    -- A tuple (w_0,...,w_k) is unsaturated iff for all j,m ∈ {0..k}
+    -- with j ≠ m, R_[i]w_j w_m ∉ ℛ.
+    tryBranch a tuple
+      | all (\(j, m) -> not (hasRel (Choice a (tuple !! j) (tuple !! m)) s))
+            [(j, m) | j <- [0 .. k], m <- [0 .. k], j /= m]
+      = Just RuleApp
+          { raPremises =
+              [ addRel (Choice a (tuple !! m) (tuple !! j)) s
+              | m <- [0 .. k - 1]
+              , j <- [m + 1 .. k]
+              ]
+          , raFreshLabels = []
+          }
+      | otherwise = Nothing
+
+-- | All ordered @(k+1)@-tuples of distinct labels drawn from a list.
+-- For small @k@ and small label sets this is fine; the prover never
+-- calls it on large inputs in practice.
+kPlus1Tuples :: Int -> [Label] -> [[Label]]
+kPlus1Tuples k lbls
+  | k < 0     = []
+  | otherwise = combinations (k + 1) lbls
+  where
+    combinations 0 _      = [[]]
+    combinations _ []     = []
+    combinations n (x:xs) = [ x : ys | ys <- combinations (n - 1) xs ]
+                          ++ combinations n xs
+
+-- ====================================================================
 -- Helpers
 -- ====================================================================
+
+-- | All agent identifiers appearing in a sequent — both in relational
+-- atoms and inside formulas.
+sequentAgents :: Sequent -> Set.Set Agent
+sequentAgents s =
+    Set.union fromRels fromForms
+  where
+    fromRels  = Set.foldr addRelAgent Set.empty (rels s)
+    fromForms = Set.foldr addLfAgents Set.empty (gamma s)
+    addRelAgent (Choice a _ _) = Set.insert a
+    addRelAgent (Ideal a _)    = Set.insert a
+    addLfAgents (LabFormula _ f) = Set.union (formulaAgents f)
+
+-- | All agent identifiers appearing inside a formula.
+formulaAgents :: Formula -> Set.Set Agent
+formulaAgents Bot                       = Set.empty
+formulaAgents (AtomF _)                 = Set.empty
+formulaAgents (Not f)                   = formulaAgents f
+formulaAgents (And l r)                 = Set.union (formulaAgents l) (formulaAgents r)
+formulaAgents (Or l r)                  = Set.union (formulaAgents l) (formulaAgents r)
+formulaAgents (Implies l r)             = Set.union (formulaAgents l) (formulaAgents r)
+formulaAgents (Iff l r)                 = Set.union (formulaAgents l) (formulaAgents r)
+formulaAgents (Box f)                   = formulaAgents f
+formulaAgents (Diamond f)               = formulaAgents f
+formulaAgents (FutureBox f)             = formulaAgents f
+formulaAgents (FutureDiamond f)         = formulaAgents f
+formulaAgents (PastBox f)               = formulaAgents f
+formulaAgents (PastDiamond f)           = formulaAgents f
+formulaAgents (Since l r)               = Set.union (formulaAgents l) (formulaAgents r)
+formulaAgents (Until l r)               = Set.union (formulaAgents l) (formulaAgents r)
+formulaAgents (Knowledge a f)           = Set.insert a (formulaAgents f)
+formulaAgents (Belief a f)              = Set.insert a (formulaAgents f)
+formulaAgents (Announce b c)            = Set.union (formulaAgents b) (formulaAgents c)
+formulaAgents (Stit a f)                = Set.insert a (formulaAgents f)
+formulaAgents (ChoiceDiamond a f)       = Set.insert a (formulaAgents f)
+formulaAgents (GroupStit f)             = formulaAgents f
+formulaAgents (Next f)                  = formulaAgents f
+formulaAgents (Ought a f)               = Set.insert a (formulaAgents f)
+formulaAgents (Permitted a f)           = Set.insert a (formulaAgents f)
 
 -- | First @Just@ result of applying @f@ to elements of a 'Set'.
 findFirst :: (a -> Maybe b) -> Set.Set a -> Maybe b

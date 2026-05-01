@@ -340,6 +340,139 @@ main = hspec $ do
         let s = singletonSequent w0 (Permitted "i" p)
         applyPermitted s `shouldBe` Nothing
 
+  -- G3DS^k_n inference rules — generating + frame fragment (issue #8 step D, part 2).
+  describe "DeonticStit.Rules: generating and frame rules" $ do
+    let p   = Atom "p"
+        w0  = label0
+        w1  = nextLabel w0
+        w2  = nextLabel w1
+
+    describe "applyBox (□ rule)" $ do
+      it "introduces a fresh label witnessing the body" $ do
+        let s = singletonSequent w0 (Box p)
+        case applyBox s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [v] } -> do
+            hasFormula (mkLabFormula v p) s' `shouldBe` True
+            -- principal preserved
+            hasFormula (mkLabFormula w0 (Box p)) s' `shouldBe` True
+          _ -> expectationFailure "applyBox should fire and yield 1 fresh label"
+
+      it "is Nothing when some label already has the body" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ singletonSequent w0 (Box p)
+        applyBox s `shouldBe` Nothing
+
+    describe "applyStit ([i] rule)" $ do
+      it "adds R_[i]w_v and v:φ for fresh v" $ do
+        let s = singletonSequent w0 (Stit "i" p)
+        case applyStit s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [v] } -> do
+            hasRel (Choice "i" w0 v) s'           `shouldBe` True
+            hasFormula (mkLabFormula v p) s'      `shouldBe` True
+          _ -> expectationFailure "applyStit should fire and yield 1 fresh label"
+
+      it "is Nothing when some R_[i]wu has u:φ" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ addRel (Choice "i" w0 w0)
+              $ singletonSequent w0 (Stit "i" p)
+        applyStit s `shouldBe` Nothing
+
+    describe "applyOught (⊗_i rule)" $ do
+      it "adds I_⊗_i v and v:φ for fresh v" $ do
+        let s = singletonSequent w0 (Ought "i" p)
+        case applyOught s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [v] } -> do
+            hasRel (Ideal "i" v) s'              `shouldBe` True
+            hasFormula (mkLabFormula v p) s'     `shouldBe` True
+          _ -> expectationFailure "applyOught should fire and yield 1 fresh label"
+
+      it "is Nothing when some I_⊗_i u has u:φ" $ do
+        let s = addFormula (mkLabFormula w0 p)
+              $ addRel (Ideal "i" w0)
+              $ singletonSequent w0 (Ought "i" p)
+        applyOught s `shouldBe` Nothing
+
+    describe "applyRef (Ref_i rule)" $ do
+      it "adds R_[i]ww when missing" $ do
+        let s = singletonSequent w0 (Stit "i" p)
+        case applyRef s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } ->
+            hasRel (Choice "i" w0 w0) s' `shouldBe` True
+          _ -> expectationFailure "applyRef should fire on a sequent missing R_[i]ww"
+
+      it "is Nothing when every (i, w) is already reflexive" $ do
+        let s = addRel (Choice "i" w0 w0)
+              $ singletonSequent w0 (Stit "i" p)
+        applyRef s `shouldBe` Nothing
+
+    describe "applyEuc (Euc_i rule)" $ do
+      it "with R_[i]wu and R_[i]wv adds R_[i]uv" $ do
+        let s = addRel (Choice "i" w0 w1)
+              $ addRel (Choice "i" w0 w2)
+              $ singletonSequent w0 (Stit "i" p)
+        case applyEuc s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } ->
+            -- some R_[i]uv with u, v ∈ {w0, w1, w2} and (u, v) not already in ℛ
+            (hasRel (Choice "i" w1 w2) s' || hasRel (Choice "i" w2 w1) s'
+              || hasRel (Choice "i" w1 w1) s' || hasRel (Choice "i" w2 w2) s')
+              `shouldBe` True
+          _ -> expectationFailure "applyEuc should fire when two R_[i]w-pairs exist"
+
+    describe "applyD3 (D3_i rule)" $ do
+      it "with I_⊗_i w and R_[i]wu adds I_⊗_i u" $ do
+        let s = addRel (Ideal  "i" w0)
+              $ addRel (Choice "i" w0 w1)
+              $ singletonSequent w0 (Permitted "i" p)
+        case applyD3 s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } ->
+            hasRel (Ideal "i" w1) s' `shouldBe` True
+          _ -> expectationFailure "applyD3 should fire when I_⊗_i w + R_[i]wu present"
+
+      it "is Nothing when ideal set is already closed under R_[i]" $ do
+        let s = addRel (Ideal  "i" w0)
+              $ addRel (Ideal  "i" w1)
+              $ addRel (Choice "i" w0 w1)
+              $ singletonSequent w0 (Permitted "i" p)
+        applyD3 s `shouldBe` Nothing
+
+    describe "applyD2 (D2_i rule)" $ do
+      it "introduces a fresh I_⊗_i v when no ideal exists for agent i" $ do
+        let s = singletonSequent w0 (Ought "i" p)
+        case applyD2 s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [v] } ->
+            hasRel (Ideal "i" v) s' `shouldBe` True
+          _ -> expectationFailure "applyD2 should fire and yield 1 fresh label"
+
+      it "is Nothing when every agent already has an ideal world" $ do
+        let s = addRel (Ideal "i" w0)
+              $ singletonSequent w0 (Ought "i" p)
+        applyD2 s `shouldBe` Nothing
+
+    describe "applyAPC (APC^k_i, limited choice)" $ do
+      it "k=0 disables the rule" $ do
+        let s = addRel (Choice "i" w0 w0)
+              $ singletonSequent w0 (Stit "i" p)
+        applyAPC 0 s `shouldBe` Nothing
+
+      it "k=1 with 2 labels and no R_[i] yields 1 premise" $ do
+        -- 2 labels from the formula's mention; APC^1 forces a single
+        -- R_[i] pair to be added.
+        let s = addFormula (mkLabFormula w1 p)
+              $ singletonSequent w0 (Stit "i" p)
+        case applyAPC 1 s of
+          Just RuleApp{ raPremises = [s'], raFreshLabels = [] } ->
+            hasRel (Choice "i" w0 w1) s' `shouldBe` True
+          _ -> expectationFailure "applyAPC 1 should produce 1 premise on a 2-label sequent"
+
+      it "k=2 with 3 labels and no R_[i] yields 3 premises" $ do
+        let s = addFormula (mkLabFormula w1 p)
+              $ addFormula (mkLabFormula w2 p)
+              $ singletonSequent w0 (Stit "i" p)
+        case applyAPC 2 s of
+          Just RuleApp{ raPremises = ps, raFreshLabels = [] } ->
+            length ps `shouldBe` 3   -- k(k+1)/2 = 3
+          _ -> expectationFailure "applyAPC 2 should produce 3 premises on a 3-label sequent"
+
   -- Figure 1.1 from B&D
   let frame11 = mkFrame ["w1", "w2", "w3"]
                   [("w1", "w2"), ("w1", "w3")]
