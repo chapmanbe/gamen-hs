@@ -12,6 +12,9 @@ kramdown:
     css_class: highlight
     block:
       line_numbers: false
+  # Don't let kramdown's own math engine touch $...$ — MathJax 3
+  # (loaded by the notebook layout) handles all math client-side.
+  math_engine: null
 
 defaults:
   - scope:
