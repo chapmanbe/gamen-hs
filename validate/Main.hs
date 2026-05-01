@@ -49,6 +49,7 @@ import Gamen.Formula
 import Gamen.Tableau (tableauConsistent, tableauProves, System(..), systemKD)
 import Gamen.Temporal (systemKDt)
 import Gamen.Doxastic (doxasticRules)
+import Gamen.DeonticStit.Prove (isFormulaSetConsistent)
 
 
 -- ═══════════════════════════════════════════════════════════════════
@@ -238,15 +239,27 @@ handleRequest :: Request -> Response
 handleRequest Ping = OkResult (toJSON ("pong" :: Text))
 
 handleRequest (CheckConsistency formulas) =
-  -- Normalize: strip agent-relative operators down to Box/Diamond
-  -- so the KD tableau can check them. Ought a p → Box p, Permitted a p → Diamond p.
-  -- Belief is preserved (passed through) so the doxastic D rule can fire.
-  let normalized = map normalizeForTableau formulas
-      consistent = tableauConsistent consistencySystem normalized
+  -- Dispatch on whether any input formula carries an agent operator.
+  -- Agent-bearing formulas route to the deontic STIT prover (which is
+  -- agent-aware and load-bearing on agency); the rest stay on the
+  -- existing KDt + doxastic-D tableau path.
+  let (consistent, prover) =
+        if any hasAgentOperator formulas
+          then ( isFormulaSetConsistent dsK dsMaxSteps formulas
+               , "deontic-stit"  :: Text )
+          else ( tableauConsistent consistencySystem
+                                   (map normalizeForTableau formulas)
+               , "kdt+doxasticD" :: Text )
   in OkResult $ object
-      [ "consistent" .= consistent
+      [ "consistent"    .= consistent
       , "formula_count" .= length formulas
+      , "prover"        .= prover
       ]
+  where
+    -- DS^k_n parameters. k=0 = unlimited choice; bump if a clinical
+    -- input genuinely needs limited-choice reasoning.
+    dsK        = 0
+    dsMaxSteps = 5000
 
 handleRequest (ValidateFormula rawJson) =
   case fromJSON rawJson of
@@ -299,18 +312,22 @@ handleRequest (ValidateAgent rawJson expectedAgent) =
         ]
 
 handleRequest (CheckPairwise formulas) =
-  let normalized = map normalizeForTableau formulas
-      pairs = [(i, j) | i <- [0..length normalized - 1]
-                       , j <- [i+1..length normalized - 1]]
+  let pairs    = [(i, j) | i <- [0..length formulas - 1]
+                         , j <- [i+1..length formulas - 1]]
+      checkPair i j =
+        let pair = [formulas !! i, formulas !! j]
+        in if any hasAgentOperator pair
+             then isFormulaSetConsistent 0 5000 pair
+             else tableauConsistent systemKD (map normalizeForTableau pair)
       conflicts = [ object [ "i" .= i, "j" .= j
                            , "formula_i" .= (formulas !! i)
                            , "formula_j" .= (formulas !! j) ]
                   | (i, j) <- pairs
-                  , not (tableauConsistent systemKD [normalized !! i, normalized !! j])
+                  , not (checkPair i j)
                   ]
   in OkResult $ object
-      [ "total_pairs" .= length pairs
-      , "conflicts" .= conflicts
+      [ "total_pairs"    .= length pairs
+      , "conflicts"      .= conflicts
       , "conflict_count" .= length conflicts
       ]
 
@@ -324,28 +341,35 @@ consistencySystem = systemKDt
   , usedPrefixRules = usedPrefixRules systemKDt ++ doxasticRules
   }
 
--- | Normalize agent-relative formulas for KD tableau checking.
--- Strips Ought/Permitted/Stit down to Box/Diamond so the tableau prover
--- (which only handles basic modal logic) can check consistency.
+-- | Normalize formulas for the KDt + doxastic-D tableau path. Used
+-- only on formulas /without/ agent operators — the dispatcher in
+-- 'CheckConsistency' / 'CheckPairwise' routes agent-bearing inputs
+-- to 'isFormulaSetConsistent' instead.
+--
+-- Temporal, modal, and doxastic operators are preserved (the
+-- tableau supports them); propositional connectives recurse. If an
+-- agent operator slips through it errors out — better to fail loud
+-- than silently strip agency.
 normalizeForTableau :: Formula -> Formula
-normalizeForTableau (Ought _ f)     = Box (normalizeForTableau f)
-normalizeForTableau (Permitted _ f) = Diamond (normalizeForTableau f)
-normalizeForTableau (Stit _ f)      = Box (normalizeForTableau f)
-normalizeForTableau (ChoiceDiamond _ f) = Diamond (normalizeForTableau f)
-normalizeForTableau (GroupStit f)    = Box (normalizeForTableau f)
-normalizeForTableau (Not f)          = Not (normalizeForTableau f)
-normalizeForTableau (And l r)        = And (normalizeForTableau l) (normalizeForTableau r)
-normalizeForTableau (Or l r)         = Or (normalizeForTableau l) (normalizeForTableau r)
-normalizeForTableau (Implies l r)    = Implies (normalizeForTableau l) (normalizeForTableau r)
-normalizeForTableau (Iff l r)        = Iff (normalizeForTableau l) (normalizeForTableau r)
-normalizeForTableau (Box f)          = Box (normalizeForTableau f)
-normalizeForTableau (Diamond f)      = Diamond (normalizeForTableau f)
-normalizeForTableau (FutureBox f)    = FutureBox (normalizeForTableau f)
-normalizeForTableau (FutureDiamond f) = FutureDiamond (normalizeForTableau f)
-normalizeForTableau (PastBox f)      = PastBox (normalizeForTableau f)
-normalizeForTableau (PastDiamond f)  = PastDiamond (normalizeForTableau f)
-normalizeForTableau (Belief a f)     = Belief a (normalizeForTableau f)
-normalizeForTableau f                = f  -- Atom, Bot, etc. pass through
+normalizeForTableau (Ought _ _)         = error "normalizeForTableau: Ought should route to deontic-stit prover"
+normalizeForTableau (Permitted _ _)     = error "normalizeForTableau: Permitted should route to deontic-stit prover"
+normalizeForTableau (Stit _ _)          = error "normalizeForTableau: Stit should route to deontic-stit prover"
+normalizeForTableau (ChoiceDiamond _ _) = error "normalizeForTableau: ChoiceDiamond should route to deontic-stit prover"
+normalizeForTableau (GroupStit _)       = error "normalizeForTableau: GroupStit not supported in the validate dispatcher"
+normalizeForTableau (Not f)             = Not (normalizeForTableau f)
+normalizeForTableau (And l r)           = And (normalizeForTableau l) (normalizeForTableau r)
+normalizeForTableau (Or l r)            = Or (normalizeForTableau l) (normalizeForTableau r)
+normalizeForTableau (Implies l r)       = Implies (normalizeForTableau l) (normalizeForTableau r)
+normalizeForTableau (Iff l r)           = Iff (normalizeForTableau l) (normalizeForTableau r)
+normalizeForTableau (Box f)             = Box (normalizeForTableau f)
+normalizeForTableau (Diamond f)         = Diamond (normalizeForTableau f)
+normalizeForTableau (FutureBox f)       = FutureBox (normalizeForTableau f)
+normalizeForTableau (FutureDiamond f)   = FutureDiamond (normalizeForTableau f)
+normalizeForTableau (PastBox f)         = PastBox (normalizeForTableau f)
+normalizeForTableau (PastDiamond f)     = PastDiamond (normalizeForTableau f)
+normalizeForTableau (Belief a f)        = Belief a (normalizeForTableau f)
+normalizeForTableau f                   = f  -- Atom, Bot, Knowledge, Announce, Next, Since, Until pass through
+
 
 
 -- | Extract atom names that appear inside agent-specific operators.

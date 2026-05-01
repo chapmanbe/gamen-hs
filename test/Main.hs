@@ -171,6 +171,22 @@ main = hspec $ do
             ]
       mapM_ (\f -> toNNF (toNNF f) `shouldBe` toNNF f) cases
 
+    it "hasAgentOperator detects Stit/Ought/Permitted/ChoiceDiamond" $ do
+      hasAgentOperator (Atom "p")                 `shouldBe` False
+      hasAgentOperator (Box (Atom "p"))           `shouldBe` False
+      hasAgentOperator (Belief "a" (Atom "p"))    `shouldBe` False
+      hasAgentOperator (Stit "i" (Atom "p"))      `shouldBe` True
+      hasAgentOperator (Ought "i" (Atom "p"))     `shouldBe` True
+      hasAgentOperator (Permitted "i" (Atom "p")) `shouldBe` True
+      hasAgentOperator (ChoiceDiamond "i" (Atom "p")) `shouldBe` True
+      -- Nested under temporal/modal operators
+      hasAgentOperator (FutureBox (Ought "c" (Atom "statin")))
+        `shouldBe` True
+      hasAgentOperator (Implies (Atom "ascvd") (Ought "c" (Atom "statin")))
+        `shouldBe` True
+      -- GroupStit is not in scope for the agent dispatcher
+      hasAgentOperator (GroupStit (Atom "p"))     `shouldBe` False
+
   -- Sequent / label / relational-atom infrastructure for the deontic
   -- STIT prover (issue #8 step C).
   describe "Sequent (Gamen.DeonticStit.Sequent)" $ do

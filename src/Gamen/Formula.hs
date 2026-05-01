@@ -19,6 +19,7 @@ module Gamen.Formula
   , pattern Atom
   , top
   , isModalFree
+  , hasAgentOperator
   , atoms
     -- * Negation Normal Form
   , toNNF
@@ -167,6 +168,36 @@ isModalFree (GroupStit _)     = False
 isModalFree (Next _)          = False
 isModalFree (Ought _ _)       = False
 isModalFree (Permitted _ _)   = False
+
+-- | Does any subformula use an agent-relative operator?
+-- True when @Stit@, @ChoiceDiamond@, @Ought@, or @Permitted@ appears
+-- anywhere in the formula. @GroupStit@ is excluded because the deontic
+-- STIT calculus has no group-obligation operator (see issue #8).
+hasAgentOperator :: Formula -> Bool
+hasAgentOperator Bot                  = False
+hasAgentOperator (AtomF _)            = False
+hasAgentOperator (Not f)              = hasAgentOperator f
+hasAgentOperator (And l r)            = hasAgentOperator l || hasAgentOperator r
+hasAgentOperator (Or l r)             = hasAgentOperator l || hasAgentOperator r
+hasAgentOperator (Implies l r)        = hasAgentOperator l || hasAgentOperator r
+hasAgentOperator (Iff l r)            = hasAgentOperator l || hasAgentOperator r
+hasAgentOperator (Box f)              = hasAgentOperator f
+hasAgentOperator (Diamond f)          = hasAgentOperator f
+hasAgentOperator (FutureBox f)        = hasAgentOperator f
+hasAgentOperator (FutureDiamond f)    = hasAgentOperator f
+hasAgentOperator (PastBox f)          = hasAgentOperator f
+hasAgentOperator (PastDiamond f)      = hasAgentOperator f
+hasAgentOperator (Since l r)          = hasAgentOperator l || hasAgentOperator r
+hasAgentOperator (Until l r)          = hasAgentOperator l || hasAgentOperator r
+hasAgentOperator (Knowledge _ f)      = hasAgentOperator f
+hasAgentOperator (Belief _ f)         = hasAgentOperator f
+hasAgentOperator (Announce b c)       = hasAgentOperator b || hasAgentOperator c
+hasAgentOperator (Stit _ _)           = True
+hasAgentOperator (ChoiceDiamond _ _)  = True
+hasAgentOperator (GroupStit _)        = False
+hasAgentOperator (Next f)             = hasAgentOperator f
+hasAgentOperator (Ought _ _)          = True
+hasAgentOperator (Permitted _ _)      = True
 
 -- | Collect all atomic propositions in a formula.
 --
