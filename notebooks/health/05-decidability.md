@@ -99,12 +99,19 @@ terminates* on the inconsistent input. Decidability means both
 A practical note: tableau search is *exponential in the worst
 case* (one new branch per disjunctive rule). When you bundle a
 real conflict in with many unrelated implications, the
-implication-driven branching may exhaust the search budget
-before the modal contradiction is reached. The
-`gamen-validate check_consistency` dispatcher mitigates this by
-running consistency checks on each formula's *direct
-projections* alongside the joint check, so a small modal
-conflict surfaces even inside a noisy rule bundle.
+implication-driven branching can exhaust the search budget
+before the modal contradiction is reached.
+
+We hit this directly in early drafts of this chapter: the same
+2-formula conflict alone returns `False`, but bundled with 10
+unrelated implications it returns `True` (apparently consistent)
+because the prover hits its 1000-step budget before the
+D-witness rule introduces a successor where the contradiction
+would close. Possible mitigations — none implemented as of
+2026-05-01 — include raising the bound, prioritising modal
+rules over propositional in the worklist, or having
+`gamen-validate` run per-formula projections alongside the
+joint check.
 
 ## When the Prover Says No: What Comes Next
 
