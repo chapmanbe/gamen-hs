@@ -7,9 +7,24 @@ layout: notebook
 
 Pedagogical chapters that introduce the library by working through
 small examples in GHCi. Read each chapter alongside an open
-`cabal repl gamen` session and copy the code blocks as you go;
+`cabal repl` session and copy the code blocks as you go;
 every `-- :eval` block has its expected output captured in the
 chapter so you can compare what your shell produces.
+
+## Setup
+
+Clone the repository once and start a REPL — that is all you need
+to follow any chapter:
+
+```bash
+git clone https://github.com/chapmanbe/gamen-hs.git
+cd gamen-hs
+cabal build        # first build takes a few minutes
+cabal repl         # opens GHCi with the gamen library in scope
+```
+
+Each chapter lists its own imports at the top; paste them into the
+REPL before working through the examples.
 
 The notebooks are organised in two parallel tracks. The **theory**
 track follows the *Boxes and Diamonds* textbook (and the deontic-
