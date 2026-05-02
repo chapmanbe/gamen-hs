@@ -14,7 +14,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 2. **Leverage Haskell's type system** — exhaustive pattern matching catches bugs that Julia misses
 3. **STIT logic for clinical guideline validation** — agency, choice, obligation, permission; duty checking, compliance checking, joint fulfillment
 4. **Build Haskell skills** — Brian is learning Haskell; Jeremiah's PhD targets list Haskell as a desired skill
-5. **Eventually: labeled sequent proof engine for deontic STIT** (Lyon & van Berkel 2024) and epistemic XSTIT (Broersen 2011)
+5. **Labeled sequent proof engine for deontic STIT** (Lyon & van Berkel 2024) — landed 2026-05-01 as the G3DS^k_n calculus (issue #8). Epistemic XSTIT (Broersen 2011) modelled but not yet wired into the prover.
 
 ## Module Status
 
@@ -31,11 +31,11 @@ This is a collaborative project between Brian Chapman (health informatics resear
 | `Gamen.Stit` | Lorini 2013 | Done | T-STIT model checking, constraint C1-C7 |
 | `Gamen.Laca` | Herzig et al. 2022 | Done | Finite control-and-attempt STIT |
 | `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT models: ought/permitted, duty/compliance/fulfillment (model layer) |
-| `Gamen.DeonticStit.Sequent` | Lyon & van Berkel 2024 | In progress | Labeled sequent infrastructure for the G3DS^k_n prover (issue #8) |
-| `Gamen.DeonticStit.Rules` | Lyon & van Berkel 2024 | In progress | Bottom-up inference rules for G3DS^k_n (closure, logical, frame, APC) |
-| `Gamen.DeonticStit.Saturation` | Lyon & van Berkel 2024 | In progress | Generation tree, blocking, and 14 saturation predicates from Definition 18 |
-| `Gamen.DeonticStit.Prove` | Lyon & van Berkel 2024 | In progress | Three-phase Algorithm 1 driver; proves K axiom, Ought-implies-Can, terminates on §4.1 counterexample |
-| `Gamen.DeonticStit.CounterModel` | Lyon & van Berkel 2024 | In progress | Stability-model extraction (Definition 20) — turns a Refuted sequent into a falsifying DSModel |
+| `Gamen.DeonticStit.Sequent` | Lyon & van Berkel 2024 | Done | Labeled sequent infrastructure for the G3DS^k_n prover (issue #8) |
+| `Gamen.DeonticStit.Rules` | Lyon & van Berkel 2024 | Done | Bottom-up inference rules for G3DS^k_n (closure, logical, frame, APC) |
+| `Gamen.DeonticStit.Saturation` | Lyon & van Berkel 2024 | Done | Generation tree, blocking, and 14 saturation predicates from Definition 18 |
+| `Gamen.DeonticStit.Prove` | Lyon & van Berkel 2024 | Done | Three-phase Algorithm 1 driver; proves K axiom, Ought-implies-Can, terminates on §4.1 counterexample |
+| `Gamen.DeonticStit.CounterModel` | Lyon & van Berkel 2024 | Done | Stability-model extraction (Definition 20) — turns a Refuted sequent into a falsifying DSModel |
 | `Gamen.Xstit` | Broersen 2011 | Done | Epistemic deontic XSTIT: mens rea, violation constants |
 
 ## Build System
@@ -113,6 +113,9 @@ Prefixed signed tableaux with:
 - `notes/haskell-landscape.md` — Haskell ecosystem assessment
 - `notes/tableau_optimization.md` — set-based membership optimization notes
 - `notes/tableau_blocking.md` — blocking optimization notes
+- `notes/deontic-stit-gap-analysis.md` — issue #8 plan (target fragment, Steps A–H, Jeremiah's design decisions)
+- `notes/deontic-stit-implementation-log.md` — companion to the gap analysis; records what actually happened during the build (Steps A–I commit map, bug fixes during Step F, deferred follow-ups)
+- `notebooks/` — pedagogical track (10 theory chapters from B&D + 10 clinical application chapters under `notebooks/health/`). Plain Markdown + Jekyll + Tufte CSS. The `notebooks/build.py` script wraps each `-- :eval` Haskell block in `print(...)` and runs via `cabal exec -- runghc`, splicing outputs back into the Markdown before Jekyll renders. **Convention gotcha:** the build script checks the *first* line of each ```haskell block for the `-- :eval` / `-- :ghci` / `-- :viz` marker — comments before the marker make the block fail to evaluate.
 
 ## Dependencies
 
