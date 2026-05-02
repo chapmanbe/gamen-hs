@@ -66,9 +66,28 @@ jobs:
       - name: Build Haddock docs
         run: |
           cabal haddock --haddock-hyperlink-source --haddock-quickjump
-          # Copy generated docs to a clean directory for deployment
           mkdir -p _site
           cp -r $(find dist-newstyle -path '*/doc/html/gamen' -type d | head -1)/* _site/
+
+      # Evaluate Haskell code blocks and splice outputs into notebook Markdown
+      - name: Evaluate notebook code blocks
+        run: |
+          for ch in notebooks/[0-9]*-*.md notebooks/health/[0-9]*-*.md; do
+            [ -f "$ch" ] && echo "→ $ch" && python3 notebooks/build.py "$ch"
+          done
+
+      # Build Jekyll notebooks into _site/notebooks/
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: notebooks
+
+      - name: Build Jekyll notebooks
+        run: |
+          cd notebooks
+          bundle exec jekyll build --destination ../_site/notebooks
 
       # Deploy to GitHub Pages
       - uses: actions/upload-pages-artifact@v3
