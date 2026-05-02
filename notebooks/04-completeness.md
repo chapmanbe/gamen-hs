@@ -84,7 +84,6 @@ $\Sigma$'s frame class) where all of $\Gamma$ are true.
 )
 ```
 
-
 ```output
 (True,True,False,True)
 ```
@@ -111,7 +110,6 @@ a world satisfying all formulas in $\Gamma$.
 , tableauConsistent systemKT [Box p, Not p]
 )
 ```
-
 
 ```output
 (True,False,True,False)

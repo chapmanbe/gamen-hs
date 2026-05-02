@@ -227,7 +227,6 @@ Truth table for $p \land q$ (conjunction):
 ]
 ```
 
-
 ```output
 [True,False,False,False]
 ```
@@ -244,7 +243,6 @@ Truth table for $p \to q$ (implication):
 , satisfies w_ff "w" p_implies_q
 ]
 ```
-
 
 ```output
 [True,False,True,True]
@@ -284,7 +282,6 @@ modus_ponens = Implies (And p (Implies p q)) q
 isTautology modus_ponens
 ```
 
-
 ```output
 True
 ```
@@ -313,7 +310,6 @@ contradiction   = And p (Not p)                             -- p ∧ ¬p
 , isTautology contradiction
 )
 ```
-
 
 ```output
 (True,True,True,False)
@@ -354,7 +350,6 @@ chain_rule = Implies (And (Implies p q) (Implies q r))
 -- :eval
 isTautology chain_rule
 ```
-
 
 ```output
 True

@@ -129,7 +129,6 @@ schemaK = Implies (Box (Implies p q)) (Implies (Box p) (Box q))
 )
 ```
 
-
 ```output
 (True,True,True,True,True)
 ```
@@ -151,7 +150,6 @@ schemaT = Implies (Box p) p
 , tableauProves systemS5 [] schemaT
 )
 ```
-
 
 ```output
 (False,False,True,True,True)
@@ -176,7 +174,6 @@ schemaD = Implies (Box p) (Diamond p)
 )
 ```
 
-
 ```output
 (False,True,True,True,True)
 ```
@@ -199,7 +196,6 @@ schema4 = Implies (Box p) (Box (Box p))
 )
 ```
 
-
 ```output
 (False,False,True,True,True)
 ```
@@ -216,7 +212,6 @@ schema5 = Implies (Diamond p) (Box (Diamond p))
 , tableauProves systemS5 [] schema5
 )
 ```
-
 
 ```output
 (False,False,True)
@@ -281,7 +276,6 @@ thm312 = Implies (Box p) (Box (Implies q p))
 tableauProves systemK [] thm312
 ```
 
-
 ```output
 True
 ```
@@ -298,7 +292,6 @@ frame_chain  = mkFrame ["w1", "w2", "w3"] [("w1", "w2"), ("w2", "w3")]
 , isValidOnFrame frame_chain  thm312
 )
 ```
-
 
 ```output
 (True,True,True)
@@ -318,7 +311,6 @@ non_reflexive = mkFrame ["w1", "w2"] [("w1", "w2")]
 , isValidOnFrame non_reflexive schemaT
 )
 ```
-
 
 ```output
 (False,False)
@@ -371,7 +363,6 @@ Schema K's instances:
 , tableauProves systemK [] (Iff (Diamond p) (Not (Box (Not p))))
 )
 ```
-
 
 ```output
 (True,True)

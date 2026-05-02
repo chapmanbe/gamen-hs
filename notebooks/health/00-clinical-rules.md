@@ -69,7 +69,6 @@ scenarioA = mkModel (mkFrame ["w"] [])
 )
 ```
 
-
 ```output
 (True,True)
 ```
@@ -89,7 +88,6 @@ scenarioB = mkModel (mkFrame ["w"] [])
 , satisfies scenarioB "w" strep
 )
 ```
-
 
 ```output
 (True,False)
@@ -130,7 +128,6 @@ to derive `erythro`.
 , satisfies patient "w" erythro
 )
 ```
-
 
 ```output
 (True,True,True)

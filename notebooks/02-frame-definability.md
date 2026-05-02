@@ -97,7 +97,6 @@ Two formulas, two verdicts:
 )
 ```
 
-
 ```output
 (True,False)
 ```
@@ -135,7 +134,6 @@ preorder = mkFrame ["w1", "w2", "w3"]
 toGraphvizModel (mkModel preorder [("p", ["w1", "w2"]), ("q", ["w2", "w3"])])
 ```
 
-
 <figure class="kripke"><img src="figures/02-frame-definability-fig-1.svg" alt="Kripke model figure 1"></figure>
 ```haskell
 -- :eval
@@ -146,7 +144,6 @@ toGraphvizModel (mkModel preorder [("p", ["w1", "w2"]), ("q", ["w2", "w3"])])
 , isEuclidean preorder
 )
 ```
-
 
 ```output
 (True,False,True,True,False)
@@ -170,7 +167,6 @@ equiv = mkFrame ["w1", "w2", "w3"]
 toGraphvizModel (mkModel equiv [("p", ["w1"]), ("q", ["w2", "w3"])])
 ```
 
-
 <figure class="kripke"><img src="figures/02-frame-definability-fig-2.svg" alt="Kripke model figure 2"></figure>
 ```haskell
 -- :eval
@@ -181,7 +177,6 @@ toGraphvizModel (mkModel equiv [("p", ["w1"]), ("q", ["w2", "w3"])])
 , isEuclidean equiv
 )
 ```
-
 
 ```output
 (True,True,True,True,True)
@@ -261,7 +256,6 @@ non_reflexive_frame = mkFrame ["w1", "w2"] [("w1", "w2")]
 )
 ```
 
-
 ```output
 ((True,True),(False,False))
 ```
@@ -293,7 +287,6 @@ non_serial_frame = mkFrame ["w1", "w2"] [("w1", "w2")]
 )
 ```
 
-
 ```output
 ((True,True),(False,False))
 ```
@@ -319,7 +312,6 @@ non_symmetric_frame = mkFrame ["w1", "w2"] [("w1", "w2"), ("w2", "w2")]
 )
 ```
 
-
 ```output
 (True,False)
 ```
@@ -344,7 +336,6 @@ non_transitive_frame = mkFrame ["w1", "w2", "w3"]
 , isValidOnFrame non_transitive_frame schema_4
 )
 ```
-
 
 ```output
 (True,False)
@@ -372,7 +363,6 @@ non_euclidean_frame = mkFrame ["w1", "w2", "w3"]
 , isValidOnFrame non_euclidean_frame schema_5
 )
 ```
-
 
 ```output
 (True,False)
@@ -438,7 +428,6 @@ schema_k = Implies (Box (Implies p q)) (Implies (Box p) (Box q))
 )
 ```
 
-
 ```output
 (True,True,True,False,True,False)
 ```
@@ -455,7 +444,6 @@ with S4 not being S5.
 , isValidOnFrame equiv schema_5
 )
 ```
-
 
 ```output
 (True,True,True,True,True,True)
