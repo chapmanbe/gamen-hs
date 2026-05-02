@@ -15,8 +15,11 @@
 #
 # (Add to your shell rc or invoke via `make RUBY_PATH=... serve` ad hoc.)
 
-CHAPTERS      := $(wildcard $(dir $(lastword $(MAKEFILE_LIST)))*-*.md)
 NOTEBOOKS_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+CHAPTERS      := $(shell find $(NOTEBOOKS_DIR) \
+                    -name '[0-9]*-*.md' \
+                    -not -path '*/build/*' \
+                    -not -path '*/_site/*')
 
 # Prefer Homebrew Ruby when available; fall back to whatever's on PATH.
 BREW_RUBY_BIN  := $(shell brew --prefix ruby 2>/dev/null)/bin
