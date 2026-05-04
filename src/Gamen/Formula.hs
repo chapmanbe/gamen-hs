@@ -12,7 +12,7 @@ module Gamen.Formula
   , Formula (Bot, Not, And, Or, Implies, Iff,
              Box, Diamond,
              FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until,
-             Knowledge, Belief, Announce,
+             Knowledge, Belief, RankedBelief, Announce,
              Stit, ChoiceDiamond, GroupStit, Next,
              Ought, Permitted,
              AtomF)
@@ -66,6 +66,11 @@ data Formula
   | Until Formula Formula     -- ^ U B C (B until C)
   | Knowledge String Formula  -- ^ K_a A (agent a knows A; factive)
   | Belief String Formula     -- ^ B_a A (agent a believes A; non-factive, KD45)
+  | RankedBelief String Int Formula
+    -- ^ κ_a(n, A): agent a's two-sided firmness of belief in A is exactly n
+    -- (Spohn 1988). Positive n: belief in A; negative n: belief in ¬A;
+    -- n = 0: explicit neutrality. The signed-Int representation builds in
+    -- Spohn's Theorem 2(a) (κ(A)=0 ∨ κ(¬A)=0) by construction.
   | Announce Formula Formula  -- ^ [B]C (public announcement)
   | Stit String Formula        -- ^ [i]A (agent i sees to it that A)
   | ChoiceDiamond String Formula -- ^ ⟨i⟩A (i has a choice that allows A)
@@ -86,7 +91,7 @@ pattern Atom n <- AtomF (MkAtom n)
 {-# COMPLETE Bot, Atom, Not, And, Or, Implies, Iff,
              Box, Diamond,
              FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until,
-             Knowledge, Belief, Announce,
+             Knowledge, Belief, RankedBelief, Announce,
              Stit, ChoiceDiamond, GroupStit, Next,
              Ought, Permitted #-}
 
@@ -125,6 +130,8 @@ instance Show Formula where
     . showString "]" . showsPrec 10 f
   showsPrec _ (Belief a f) = showString "B[" . showString a
     . showString "]" . showsPrec 10 f
+  showsPrec _ (RankedBelief a n f) = showString "κ[" . showString a
+    . showString "," . shows n . showString "]" . showsPrec 10 f
   showsPrec _ (Announce b c) = showString "[" . shows b
     . showString "]" . showsPrec 10 c
   showsPrec _ (Stit a f)    = showString "[" . showString a
@@ -161,6 +168,7 @@ isModalFree (Since _ _)       = False
 isModalFree (Until _ _)       = False
 isModalFree (Knowledge _ _)   = False
 isModalFree (Belief _ _)      = False
+isModalFree (RankedBelief _ _ _) = False
 isModalFree (Announce _ _)    = False
 isModalFree (Stit _ _)        = False
 isModalFree (ChoiceDiamond _ _) = False
@@ -191,6 +199,7 @@ hasAgentOperator (Since l r)          = hasAgentOperator l || hasAgentOperator r
 hasAgentOperator (Until l r)          = hasAgentOperator l || hasAgentOperator r
 hasAgentOperator (Knowledge _ f)      = hasAgentOperator f
 hasAgentOperator (Belief _ f)         = hasAgentOperator f
+hasAgentOperator (RankedBelief _ _ f) = hasAgentOperator f
 hasAgentOperator (Announce b c)       = hasAgentOperator b || hasAgentOperator c
 hasAgentOperator (Stit _ _)           = True
 hasAgentOperator (ChoiceDiamond _ _)  = True
@@ -222,6 +231,7 @@ atoms (Since l r)       = atoms l `Set.union` atoms r
 atoms (Until l r)       = atoms l `Set.union` atoms r
 atoms (Knowledge _ f)   = atoms f
 atoms (Belief _ f)      = atoms f
+atoms (RankedBelief _ _ f) = atoms f
 atoms (Announce b c)    = atoms b `Set.union` atoms c
 atoms (Stit _ f)        = atoms f
 atoms (ChoiceDiamond _ f) = atoms f
@@ -278,6 +288,7 @@ toNNF (Since l r)          = Since (toNNF l) (toNNF r)
 toNNF (Until l r)          = Until (toNNF l) (toNNF r)
 toNNF (Knowledge a f)      = Knowledge a (toNNF f)
 toNNF (Belief a f)         = Belief a (toNNF f)
+toNNF (RankedBelief a n f) = RankedBelief a n (toNNF f)
 toNNF (Announce b c)       = Announce (toNNF b) (toNNF c)
 toNNF (Stit a f)           = Stit a (toNNF f)
 toNNF (ChoiceDiamond a f)  = ChoiceDiamond a (toNNF f)
@@ -311,6 +322,7 @@ pushNeg (Permitted a f)      = Ought a (pushNeg f)
 -- recursively normalise the body.
 pushNeg f@(Knowledge _ _)    = Not (toNNF f)
 pushNeg f@(Belief _ _)       = Not (toNNF f)
+pushNeg f@(RankedBelief _ _ _) = Not (toNNF f)
 pushNeg f@(Announce _ _)     = Not (toNNF f)
 pushNeg f@(GroupStit _)      = Not (toNNF f)
 pushNeg f@(Next _)           = Not (toNNF f)
@@ -327,6 +339,7 @@ isNNF (Not Bot)                 = True
 isNNF (Not (AtomF _))           = True
 isNNF (Not (Knowledge _ f))     = isNNF f
 isNNF (Not (Belief _ f))        = isNNF f
+isNNF (Not (RankedBelief _ _ f)) = isNNF f
 isNNF (Not (Announce a b))      = isNNF a && isNNF b
 isNNF (Not (GroupStit f))       = isNNF f
 isNNF (Not (Next f))            = isNNF f
@@ -347,6 +360,7 @@ isNNF (Since l r)               = isNNF l && isNNF r
 isNNF (Until l r)               = isNNF l && isNNF r
 isNNF (Knowledge _ f)           = isNNF f
 isNNF (Belief _ f)              = isNNF f
+isNNF (RankedBelief _ _ f)      = isNNF f
 isNNF (Announce b c)            = isNNF b && isNNF c
 isNNF (Stit _ f)                = isNNF f
 isNNF (ChoiceDiamond _ f)       = isNNF f

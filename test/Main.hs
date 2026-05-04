@@ -19,6 +19,7 @@ import Gamen.Laca
 import Gamen.Semantics
 import Gamen.Stit
 import Gamen.Doxastic
+import Gamen.RankingTheory
 import Gamen.Tableau
 import Gamen.Temporal
 import Gamen.Xstit
@@ -2394,3 +2395,245 @@ main = hspec $ do
           partial = Map.fromList [("p", True)]
       evaluate (lSatisfies lm partial Set.empty (Atom "p"))
         `shouldThrow` anyErrorCall
+
+  -- =================================================================
+  -- Ranking theory (Spohn 1988): RankedBelief constructor, KappaModel
+  -- semantics, conditionalization, tableau closure rules. (issue #10)
+  -- =================================================================
+  describe "RankingTheory: Formula constructor and Show" $ do
+
+    it "RankedBelief shows with κ-notation and signed rank" $ do
+      show (RankedBelief "c" 2 (Atom "X"))
+        `shouldBe` "κ[c,2]X"
+      show (RankedBelief "c" (-2) (Atom "X"))
+        `shouldBe` "κ[c,-2]X"
+      show (RankedBelief "c" 0 (Atom "X"))
+        `shouldBe` "κ[c,0]X"
+
+    it "rank-0 is a meaningful (non-vacuous) assertion under signed semantics" $ do
+      -- Distinct from RankedBelief at any other rank
+      RankedBelief "c" 0 (Atom "X") `shouldNotBe`
+        RankedBelief "c" 1 (Atom "X")
+
+    it "atoms recurses under RankedBelief" $ do
+      atoms (RankedBelief "c" 2 (And (Atom "p") (Atom "q")))
+        `shouldBe` Set.fromList [MkAtom "p", MkAtom "q"]
+
+    it "toNNF preserves RankedBelief structure" $ do
+      toNNF (RankedBelief "c" 2 (Implies (Atom "p") (Atom "q")))
+        `shouldBe`
+        RankedBelief "c" 2 (Or (Not (Atom "p")) (Atom "q"))
+
+    it "isNNF accepts RankedBelief over an NNF body" $ do
+      isNNF (RankedBelief "c" 2 (Atom "p")) `shouldBe` True
+      isNNF (RankedBelief "c" 2 (Implies (Atom "p") (Atom "q")))
+        `shouldBe` False
+
+  describe "RankingTheory: KappaModel semantics" $ do
+
+    -- A two-world model: w1 ⊨ X, w2 ⊨ ¬X. Agent c assigns
+    -- κ_c(w1) = 0, κ_c(w2) = 2 — so c believes X with firmness 2.
+    let m2 = mkKappaModel
+              ["w1", "w2"]
+              [("c", [("w1", 0), ("w2", 2)])]
+              [("X", ["w1"])]
+
+    it "wellFormed accepts a properly constructed model" $ do
+      wellFormed m2 `shouldBe` True
+
+    it "wellFormed rejects a model with no κ=0 world" $ do
+      let bad = mkKappaModel
+                  ["w1"]
+                  [("c", [("w1", 1)])]
+                  []
+      wellFormed bad `shouldBe` False
+
+    it "kappaProp computes min over a proposition" $ do
+      kappaProp m2 "c" (Set.fromList ["w1"])     `shouldBe` 0
+      kappaProp m2 "c" (Set.fromList ["w2"])     `shouldBe` 2
+      kappaProp m2 "c" (Set.fromList ["w1","w2"]) `shouldBe` 0
+
+    it "tau gives a positive firmness for a believed proposition" $ do
+      tau m2 "c" (Atom "X") `shouldBe` 2
+
+    it "tau gives a negative firmness for a disbelieved proposition" $ do
+      tau m2 "c" (Not (Atom "X")) `shouldBe` (-2)
+
+    it "kappaSat: RankedBelief holds at the asserted exact rank" $ do
+      kappaSat m2 "w1" (RankedBelief "c" 2 (Atom "X"))    `shouldBe` True
+      kappaSat m2 "w1" (RankedBelief "c" 1 (Atom "X"))    `shouldBe` False
+      kappaSat m2 "w1" (RankedBelief "c" (-2) (Atom "X")) `shouldBe` False
+
+    it "kappaSat: RankedBelief is global (same answer at every world)" $ do
+      kappaSat m2 "w1" (RankedBelief "c" 2 (Atom "X")) `shouldBe`
+        kappaSat m2 "w2" (RankedBelief "c" 2 (Atom "X"))
+
+    it "kappaSat: rank-0 (neutrality) holds when both halves are at κ=0" $ do
+      let mNeutral = mkKappaModel
+                       ["w1","w2"]
+                       [("c", [("w1", 0), ("w2", 0)])]
+                       [("X", ["w1"])]
+      kappaSat mNeutral "w1" (RankedBelief "c" 0 (Atom "X")) `shouldBe` True
+
+    it "kappaSat negation symmetry: τ(¬φ) = -τ(φ)" $ do
+      kappaSat m2 "w1" (RankedBelief "c" (-2) (Not (Atom "X"))) `shouldBe` True
+
+    it "kappaSat errors on a world not in the model" $ do
+      evaluate (kappaSat m2 "wstray" (Atom "X"))
+        `shouldThrow` anyErrorCall
+
+  describe "RankingTheory: Conditionalization (Spohn Def. 6)" $ do
+
+    -- Start from a neutral state and apply +2 evidence for X.
+    let neutral = mkKappaModel
+                    ["w1","w2"]
+                    [("c", [("w1", 0), ("w2", 0)])]
+                    [("X", ["w1"])]
+
+    it "conditionalize +n shifts ¬φ-worlds up by n (overwrite)" $ do
+      let m' = conditionalize neutral "c" (Atom "X") 2
+      tau m' "c" (Atom "X") `shouldBe` 2
+
+    it "conditionalize -n shifts φ-worlds up by n (evidence against)" $ do
+      let m' = conditionalize neutral "c" (Atom "X") (-3)
+      tau m' "c" (Atom "X") `shouldBe` (-3)
+
+    it "conditionalize is overwrite, not additive (Spohn p.117)" $ do
+      -- Sequencing two conditionalize calls leaves the LAST firmness,
+      -- not their sum. Use 'applyEvidence' for cumulative aggregation.
+      let m1 = conditionalize neutral "c" (Atom "X") 2
+          m2' = conditionalize m1     "c" (Atom "X") 1
+      tau m2' "c" (Atom "X") `shouldBe` 1
+
+    it "conditionalization preserves well-formedness" $ do
+      let m' = conditionalize neutral "c" (Atom "X") 2
+      wellFormed m' `shouldBe` True
+
+  describe "RankingTheory: applyEvidence (additive aggregation)" $ do
+
+    let neutral = mkKappaModel
+                    ["w1","w2"]
+                    [("c", [("w1", 0), ("w2", 0)])]
+                    [("X", ["w1"])]
+
+    it "two +evidence applications stack additively" $ do
+      let m1 = applyEvidence neutral "c" (Atom "X") 2
+          m2' = applyEvidence m1     "c" (Atom "X") 1
+      tau m2' "c" (Atom "X") `shouldBe` 3
+
+    it "+ evidence followed by - evidence partially cancels" $ do
+      let m1 = applyEvidence neutral "c" (Atom "X") 2
+          m2' = applyEvidence m1     "c" (Atom "X") (-1)
+      tau m2' "c" (Atom "X") `shouldBe` 1
+
+    it "+ and - of equal magnitude returns to neutrality" $ do
+      let m1 = applyEvidence neutral "c" (Atom "X") 2
+          m2' = applyEvidence m1     "c" (Atom "X") (-2)
+      tau m2' "c" (Atom "X") `shouldBe` 0
+
+    it "applyEvidence preserves well-formedness" $ do
+      let m' = applyEvidence neutral "c" (Atom "X") 2
+      wellFormed m' `shouldBe` True
+
+  describe "RankingTheory: combineIndependent (use under independence only)" $ do
+
+    it "is integer addition" $ do
+      combineIndependent 2 3      `shouldBe` 5
+      combineIndependent 2 (-3)   `shouldBe` (-1)
+      combineIndependent (-2) (-3) `shouldBe` (-5)
+      combineIndependent 0 0      `shouldBe` 0
+
+  describe "RankingTheory: Belief ↔ RankedBelief translation" $ do
+
+    it "beliefToRanked promotes Belief to RankedBelief at given rank" $ do
+      beliefToRanked 2 (Belief "c" (Atom "X"))
+        `shouldBe` RankedBelief "c" 2 (Atom "X")
+
+    it "beliefToRanked recurses under modal operators" $ do
+      beliefToRanked 1 (And (Belief "c" (Atom "X")) (Box (Belief "d" (Atom "Y"))))
+        `shouldBe`
+        And (RankedBelief "c" 1 (Atom "X"))
+            (Box (RankedBelief "d" 1 (Atom "Y")))
+
+    it "rankedToBelief: positive rank → Belief over the operand" $ do
+      rankedToBelief (RankedBelief "c" 2 (Atom "X"))
+        `shouldBe` Just (Belief "c" (Atom "X"))
+
+    it "rankedToBelief: negative rank → Belief over the negated operand" $ do
+      rankedToBelief (RankedBelief "c" (-2) (Atom "X"))
+        `shouldBe` Just (Belief "c" (Not (Atom "X")))
+
+    it "rankedToBelief: rank-0 has no binary equivalent" $ do
+      rankedToBelief (RankedBelief "c" 0 (Atom "X")) `shouldBe` Nothing
+
+  describe "RankingTheory: Tableau closure rules (Spohn Theorem 2(a))" $ do
+
+    -- A K system extended with the ranking rules.
+    let systemRanking = systemK { usedPrefixRules = rankingRules }
+        check fs = tableauConsistent systemRanking fs
+
+    it "single ranked-belief assertion is consistent" $ do
+      check [RankedBelief "c" 2 (Atom "X")] `shouldBe` True
+
+    it "rank-0 (neutrality) alone is consistent" $ do
+      check [RankedBelief "c" 0 (Atom "X")] `shouldBe` True
+
+    it "functionality: same agent + operand at different ranks closes" $ do
+      check [ RankedBelief "c" 2 (Atom "X")
+            , RankedBelief "c" 3 (Atom "X") ]
+        `shouldBe` False
+
+    it "negation symmetry: positive φ + positive ¬φ closes" $ do
+      check [ RankedBelief "c" 2 (Atom "X")
+            , RankedBelief "c" 1 (Not (Atom "X")) ]
+        `shouldBe` False
+
+    it "negation symmetry holds when m = -n: consistent" $ do
+      check [ RankedBelief "c" 2 (Atom "X")
+            , RankedBelief "c" (-2) (Not (Atom "X")) ]
+        `shouldBe` True
+
+    it "different agents are independent" $ do
+      check [ RankedBelief "radA" 2    (Atom "X")
+            , RankedBelief "radB" (-3) (Atom "X") ]
+        `shouldBe` True
+
+    it "cwyde mapping: DEFINITE + AMBIVALENT-of-other-finding is consistent" $ do
+      check [ RankedBelief "c" 2 (Atom "PE")
+            , RankedBelief "c" 0 (Atom "Pneumonia") ]
+        `shouldBe` True
+
+    it "cwyde mapping: DEFINITE_EXISTENCE + DEFINITE_NEGATED on same finding closes" $ do
+      check [ RankedBelief "c" 2    (Atom "PE")
+            , RankedBelief "c" (-2) (Atom "PE") ]
+        `shouldBe` False
+
+  describe "RankingTheory: cwyde 5-row assertion-category mapping" $ do
+
+    let assertion cat = case cat of
+          "DEFINITE_EXISTENCE"          -> RankedBelief "c" 2    (Atom "X")
+          "PROBABLE_EXISTENCE"          -> RankedBelief "c" 1    (Atom "X")
+          "AMBIVALENT_EXISTENCE"        -> RankedBelief "c" 0    (Atom "X")
+          "PROBABLE_NEGATED_EXISTENCE"  -> RankedBelief "c" (-1) (Atom "X")
+          "DEFINITE_NEGATED_EXISTENCE"  -> RankedBelief "c" (-2) (Atom "X")
+          _ -> error "unknown cwyde category"
+        sysR = systemK { usedPrefixRules = rankingRules }
+
+    it "each cwyde category alone is consistent" $ do
+      mapM_ (\cat ->
+        tableauConsistent sysR [assertion cat] `shouldBe` True)
+        [ "DEFINITE_EXISTENCE", "PROBABLE_EXISTENCE", "AMBIVALENT_EXISTENCE"
+        , "PROBABLE_NEGATED_EXISTENCE", "DEFINITE_NEGATED_EXISTENCE"
+        ]
+
+    it "DEFINITE + DEFINITE_NEGATED on same finding is inconsistent" $ do
+      tableauConsistent sysR
+        [ assertion "DEFINITE_EXISTENCE"
+        , assertion "DEFINITE_NEGATED_EXISTENCE" ]
+        `shouldBe` False
+
+    it "DEFINITE + PROBABLE_NEGATED on same finding is inconsistent" $ do
+      tableauConsistent sysR
+        [ assertion "DEFINITE_EXISTENCE"
+        , assertion "PROBABLE_NEGATED_EXISTENCE" ]
+        `shouldBe` False

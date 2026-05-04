@@ -25,6 +25,7 @@ library
     Gamen.FrameProperties
     Gamen.Kripke
     Gamen.Laca
+    Gamen.RankingTheory
     Gamen.Semantics
     Gamen.Stit
     Gamen.Tableau
@@ -33,6 +34,7 @@ library
     Gamen.Xstit
   hs-source-dirs:   src
   default-language: GHC2021
+  ghc-options:      -Wincomplete-patterns
   build-depends:
     base >= 4.17 && < 5,
     containers >= 0.6

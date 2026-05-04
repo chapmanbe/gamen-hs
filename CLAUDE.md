@@ -20,7 +20,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 
 | Module | Source | Status | Description |
 |--------|--------|--------|-------------|
-| `Gamen.Formula` | B&D + STIT papers | Done | 25-constructor formula ADT |
+| `Gamen.Formula` | B&D + STIT papers | Done | 26-constructor formula ADT |
 | `Gamen.Kripke` | B&D Ch. 1 | Done | Kripke frames and models |
 | `Gamen.Semantics` | B&D Ch. 1 | Done | Satisfaction relation |
 | `Gamen.FrameProperties` | B&D Ch. 2 | Done | Frame predicates + frame validity |
@@ -28,6 +28,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 | `Gamen.Temporal` | B&D Ch. 14 | Done | G/F/H/P operators, KDt system (past rules added 2026-04) |
 | `Gamen.Epistemic` | B&D Ch. 15 | Done | Multi-agent knowledge + belief, announcements, bisimulation |
 | `Gamen.Doxastic` | KD45 | Done | Belief operator B_a; D-axiom tableau rule |
+| `Gamen.RankingTheory` | Spohn 1988 | Done | Ranking-theoretic graded belief: signed `RankedBelief` operator, `KappaModel`, conditionalization (Def. 6), `applyEvidence` for additive aggregation, functionality + negation-symmetry tableau closure rules (issue #10) |
 | `Gamen.Stit` | Lorini 2013 | Done | T-STIT model checking, constraint C1-C7 |
 | `Gamen.Laca` | Herzig et al. 2022 | Done | Finite control-and-attempt STIT |
 | `Gamen.DeonticStit` | Lyon & van Berkel 2024 | Done | Deontic STIT models: ought/permitted, duty/compliance/fulfillment (model layer) |
@@ -43,7 +44,7 @@ This is a collaborative project between Brian Chapman (health informatics resear
 Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 
 - `cabal build` — compile
-- `cabal test --enable-tests` — run tests (314 tests)
+- `cabal test --enable-tests` — run tests (354 tests)
 - `cabal repl` — interactive GHCi with library loaded
 
 ## Coding Conventions
@@ -51,20 +52,20 @@ Uses cabal (not stack). GHC 9.8, GHC2021 language standard.
 - Follow standard Haskell style: camelCase for functions/variables, PascalCase for types/constructors
 - Use `GHC2021` language standard (enables common extensions by default)
 - Use qualified imports for containers: `import Data.Map.Strict qualified as Map`
-- Every function on `Formula` must handle all 25 constructors — rely on GHC's exhaustiveness warnings
+- Every function on `Formula` must handle all 26 constructors — rely on GHC's exhaustiveness warnings (`-Wincomplete-patterns` is on for the library)
 - Modules under `Gamen.*` namespace
 - Tests use hspec
 
 ## Architecture
 
-### Formula ADT (25 constructors)
+### Formula ADT (26 constructors)
 
 Single closed algebraic data type. Adding a constructor requires updating every pattern-matching function — the compiler enforces this. Constructors span:
 - Propositional: Bot, Atom, Not, And, Or, Implies, Iff
 - Modal: Box, Diamond
 - Temporal: FutureBox, FutureDiamond, PastBox, PastDiamond, Since, Until
 - Epistemic: Knowledge, Announce
-- Doxastic: Belief
+- Doxastic: Belief, RankedBelief (signed two-sided rank, Spohn 1988)
 - STIT: Stit, ChoiceDiamond, GroupStit, Next
 - Deontic STIT: Ought, Permitted
 
@@ -79,6 +80,7 @@ Each logic has its own model type with its own satisfaction function:
 - `LacaModel` / `lSatisfies` — LACA (control function + successor)
 - `DSModel` / `dsSatisfies` — Deontic STIT (choice + ideal sets)
 - `XstitModel` / `xSatisfies` — XSTIT (choice + epistemic + violation constants)
+- `KappaModel` / `kappaSat` — Ranking theory (per-agent OCFs, Spohn 1988)
 
 ### Tableau Prover
 
@@ -97,6 +99,7 @@ Prefixed signed tableaux with:
 - **Herzig, Lorini & Perrotin (2022)**: LACA — finite grounded STIT (Phase 2)
 - **Lyon & van Berkel (2024)**: Deontic STIT proof theory — duty/compliance/fulfillment (Phase 3)
 - **Broersen (2011)**: XSTIT epistemic deontic — mens rea categories (Phase 4)
+- **Spohn (1988)**: Ordinal conditional functions — ranking-theoretic graded belief (issue #10). Local PDF at `notes/spohn1988-ordinal-conditional-functions.pdf`
 - **Gamen.jl source**: `~/Code/Julia/Gamen.jl/src/` — original reference implementation
 
 ## Executables

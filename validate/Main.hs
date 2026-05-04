@@ -104,6 +104,7 @@ parseTreeFormat o typ = case typ of
   "until"           -> Until <$> o .: "left" <*> o .: "right"
   "knowledge"       -> Knowledge . T.unpack <$> o .: "agent" <*> o .: "operand"
   "belief"          -> Belief . T.unpack <$> o .: "agent" <*> o .: "operand"
+  "ranked_belief"   -> RankedBelief . T.unpack <$> o .: "agent" <*> o .: "rank" <*> o .: "operand"
   "announce"        -> Announce <$> o .: "left" <*> o .: "right"
   "stit"            -> Stit . T.unpack <$> o .: "agent" <*> o .: "operand"
   "choice_diamond"  -> ChoiceDiamond . T.unpack <$> o .: "agent" <*> o .: "operand"
@@ -179,6 +180,7 @@ instance ToJSON Formula where
   toJSON (Until l r)   = object ["type" .= ("until" :: Text), "left" .= l, "right" .= r]
   toJSON (Knowledge a f) = object ["type" .= ("knowledge" :: Text), "agent" .= a, "operand" .= f]
   toJSON (Belief a f)    = object ["type" .= ("belief" :: Text), "agent" .= a, "operand" .= f]
+  toJSON (RankedBelief a n f) = object ["type" .= ("ranked_belief" :: Text), "agent" .= a, "rank" .= n, "operand" .= f]
   toJSON (Announce b c)  = object ["type" .= ("announce" :: Text), "left" .= b, "right" .= c]
   toJSON (Stit a f)    = object ["type" .= ("stit" :: Text), "agent" .= a, "operand" .= f]
   toJSON (ChoiceDiamond a f) = object ["type" .= ("choice_diamond" :: Text), "agent" .= a, "operand" .= f]
@@ -368,6 +370,7 @@ normalizeForTableau (FutureDiamond f)   = FutureDiamond (normalizeForTableau f)
 normalizeForTableau (PastBox f)         = PastBox (normalizeForTableau f)
 normalizeForTableau (PastDiamond f)     = PastDiamond (normalizeForTableau f)
 normalizeForTableau (Belief a f)        = Belief a (normalizeForTableau f)
+normalizeForTableau (RankedBelief a n f) = RankedBelief a n (normalizeForTableau f)
 normalizeForTableau f                   = f  -- Atom, Bot, Knowledge, Announce, Next, Since, Until pass through
 
 

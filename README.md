@@ -22,7 +22,7 @@ gamen-hs provides a formal framework for reasoning about **obligation**, **agenc
 
 | Module | Logic | What it does |
 |--------|-------|-------------|
-| `Gamen.Formula` | -- | 24-constructor formula type covering propositional, modal, temporal, epistemic, and STIT operators |
+| `Gamen.Formula` | -- | 26-constructor formula type covering propositional, modal, temporal, epistemic, doxastic, ranked-belief, and STIT operators |
 | `Gamen.Kripke` | -- | Kripke frames and models |
 | `Gamen.Semantics` | K | Satisfaction relation for basic modal logic |
 | `Gamen.FrameProperties` | K-S5 | Frame property predicates (reflexivity, transitivity, ...) and validity checking |
@@ -33,6 +33,7 @@ gamen-hs provides a formal framework for reasoning about **obligation**, **agenc
 | `Gamen.Laca` | LACA | Finite control-and-attempt STIT (Herzig et al. 2022) |
 | `Gamen.DeonticStit` | DS | Deontic STIT: ought, permitted, duty/compliance/fulfillment checking (Lyon & van Berkel 2024) |
 | `Gamen.Xstit` | XSTIT | Epistemic deontic STIT: obligation via violation constants, mens rea classification (Broersen 2011) |
+| `Gamen.RankingTheory` | OCF | Ranking-theoretic graded belief: signed `RankedBelief` operator, per-agent κ-functions, Spohn-style conditionalization, additive evidence aggregation (Spohn 1988) |
 
 ## Installation
 

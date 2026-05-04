@@ -222,6 +222,8 @@ xSatisfies _ _ (Until _ _) =
   error "Until not supported in XSTIT"
 xSatisfies _ _ (Belief _ _) =
   error "Belief not supported in XSTIT; use Gamen.Epistemic"
+xSatisfies _ _ (RankedBelief _ _ _) =
+  error "RankedBelief not supported in XSTIT; use Gamen.RankingTheory"
 xSatisfies _ _ (Announce _ _) =
   error "Announce not supported in XSTIT"
 xSatisfies _ _ (GroupStit _) =

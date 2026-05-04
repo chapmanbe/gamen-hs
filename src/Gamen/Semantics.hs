@@ -116,6 +116,8 @@ satisfies _ _ (Knowledge _ _) =
   error "Knowledge operator requires an EpistemicModel (use Gamen.Epistemic)"
 satisfies _ _ (Belief _ _) =
   error "Belief operator requires an EpistemicModel (use Gamen.Epistemic)"
+satisfies _ _ (RankedBelief _ _ _) =
+  error "RankedBelief operator requires a KappaModel (use Gamen.RankingTheory)"
 satisfies _ _ (Announce _ _) =
   error "Announce operator requires an EpistemicModel (use Gamen.Epistemic)"
 satisfies _ _ (Stit _ _) =

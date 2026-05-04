@@ -473,6 +473,7 @@ formulaAgents (Since l r)               = Set.union (formulaAgents l) (formulaAg
 formulaAgents (Until l r)               = Set.union (formulaAgents l) (formulaAgents r)
 formulaAgents (Knowledge a f)           = Set.insert a (formulaAgents f)
 formulaAgents (Belief a f)              = Set.insert a (formulaAgents f)
+formulaAgents (RankedBelief a _ f)       = Set.insert a (formulaAgents f)
 formulaAgents (Announce b c)            = Set.union (formulaAgents b) (formulaAgents c)
 formulaAgents (Stit a f)                = Set.insert a (formulaAgents f)
 formulaAgents (ChoiceDiamond a f)       = Set.insert a (formulaAgents f)

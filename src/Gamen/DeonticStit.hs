@@ -173,6 +173,7 @@ dsSatisfies _ _ (Since _ _)       = error "Since not supported in DS models"
 dsSatisfies _ _ (Until _ _)       = error "Until not supported in DS models"
 dsSatisfies _ _ (Knowledge _ _)   = error "Knowledge not supported in DS models"
 dsSatisfies _ _ (Belief _ _)      = error "Belief not supported in DS models"
+dsSatisfies _ _ (RankedBelief _ _ _) = error "RankedBelief not supported in DS models; use Gamen.RankingTheory"
 dsSatisfies _ _ (Announce _ _)    = error "Announce not supported in DS models"
 dsSatisfies _ _ (Next _)          = error "Next not supported in DS models"
 
