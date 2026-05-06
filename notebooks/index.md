@@ -54,6 +54,14 @@ order.
     Announce, common knowledge.
 16. [Deontic STIT](16-deontic-stit.html) — agency, ought/permitted,
     the agent-aware prover from issue #8.
+17. [Doxastic Logic](17-doxastic.html) — non-factive belief KD45;
+    the D-axiom and why CDS systems must not believe contradictions.
+18. [Ranking Theory](18-ranking-theory.html) — Spohn (1988) ordinal
+    conditional functions; graded belief, conditionalization, and the
+    cwyde assertion-certainty mapping.
+22. [DCLEG](22-dcleg.html) — Jeremiah Chapman's Doxastic Conditional
+    Logic of Extensive Games; counterfactual reasoning over FPIE game
+    trees.
 
 ## Applications (Clinical)
 
