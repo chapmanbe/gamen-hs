@@ -59,6 +59,15 @@ order.
 18. [Ranking Theory](18-ranking-theory.html) — Spohn (1988) ordinal
     conditional functions; graded belief, conditionalization, and the
     cwyde assertion-certainty mapping.
+19. [STIT: Seeing To It That](19-stit.html) — T-STIT agency (Lorini
+    2013); choice cells, moments, settled truth vs. agency, grand
+    coalition, and the seven frame constraints C1–C7.
+20. [LACA](20-laca.html) — Logic of Agency based on Control and
+    Attempt (Herzig et al. 2022); propositional state spaces, atom
+    control, succState, and PSPACE tractability.
+21. [XSTIT](21-xstit.html) — Epistemic deontic STIT (Broersen 2011);
+    violation constants, obligation, and the five mens rea categories
+    (purposeful, knowing, reckless, negligent, strict liability).
 22. [DCLEG](22-dcleg.html) — Jeremiah Chapman's Doxastic Conditional
     Logic of Extensive Games; counterfactual reasoning over FPIE game
     trees.
@@ -91,6 +100,24 @@ order.
 16. [Guideline Conflicts via Deontic STIT](health/16-guideline-conflicts.html)
     — AHA + KDIGO + USDA case study; three encodings, three
     verdicts; the clinical headline of issue #8.
+17. [CDS Belief Coherence](health/17-doxastic-clinical.html) — NLP-
+    extracted clinical assertions as belief operators; the D-axiom
+    catches single-source contradictions (cwyde application).
+18. [Assertion Certainty and Ranked Beliefs](health/18-ranking-theory-clinical.html)
+    — HFrEF diagnosis as an OCF; mapping DEFINITE/PROBABLE/AMBIVALENT
+    to signed ranks; conditionalization on new evidence.
+19. [Antibiotic Agency in Sepsis](health/19-stit-clinical.html) —
+    T-STIT model of physician vs. nurse agency; Stit vs. Box for
+    individual vs. settled obligation.
+20. [Sepsis Bundle as LACA](health/20-laca-clinical.html) — five
+    bundle atoms, three agent roles; succState traces bundle
+    completion; Stit identifies which agent must act.
+21. [Mens Rea for Medical Error](health/21-xstit-clinical.html) —
+    XSTIT formalization of purposeful, knowing, reckless, negligent,
+    and strict-liability error; violation constants in gamen-validate.
+22. [Treatment Choice as a Game](health/22-dcleg-clinical.html) —
+    DCLEG counterfactual reasoning over a binary treatment decision;
+    physician deliberation as an FPIE game.
 
 The companion API documentation lives at the
 [Haddock pages](../) for this project.
