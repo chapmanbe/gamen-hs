@@ -13,6 +13,7 @@ build-type:      Simple
 
 library
   exposed-modules:
+    Gamen.Dcleg
     Gamen.DeonticStit
     Gamen.DeonticStit.CounterModel
     Gamen.DeonticStit.Prove
@@ -42,13 +43,15 @@ library
 test-suite gamen-test
   type:             exitcode-stdio-1.0
   main-is:          Main.hs
+  other-modules:    PaperCorrespondence, Properties
   hs-source-dirs:   test
   default-language: GHC2021
   build-depends:
     base >= 4.17 && < 5,
     containers >= 0.6,
     gamen,
-    hspec >= 2.10
+    hspec >= 2.10,
+    QuickCheck >= 2.14
 
 executable gamen-repl
   main-is:          Main.hs

@@ -1,0 +1,268 @@
+\documentclass{article}
+\input{../DCLEGComms.tex}
+\usepackage[backend=biber,style=authoryear]{biblatex}
+\addbibresource{../resources.bib}
+\let\cite\textcite
+
+
+\title{Doxastic Conditional Logic of Extensive Games\\
+(v5.0)}
+\author{Jeremiah Chapman\\ Supervisor: Martin Kaså}
+\affil{University of Gothenburg}
+\date{April 2026}
+
+\begin{document}
+\include{DCLEGComms}
+
+\maketitle
+\section{Syntax}
+\subsection{Formulae}
+Let $\Agt$ be a finite set of agents, $\Act$ a finite set of moves, $N$ a finite set of integers, and $\Prop$ a set of propositional variables. The atomic formulae are as follows:
+\begin{itemize}
+    \item $\bot$,
+    \item $p$, where $p\in\Prop$,
+    \item $\turn_i$, where $i\in\Agt$,
+    \item $m$, where $m\in\Act$, and
+    \item $k_i$, where $k\in N$ and $i\in\Agt$.
+\end{itemize}
+$\bot$ represents falsity. $\turn_i$ should be read as ``It is player $i$'s turn'', $m$ as ``Move $m$ is played this turn'', and $k_i$ as ``Player $i$ ultimately gets a payoff of $k$.'' 
+
+We build formulae inductively as follows. Every atomic formula is a formula. If $\varphi$ and $\psi$ are formulae: 
+\begin{itemize}
+    \item $\lnot\varphi$ is a formula,
+    \item $\varphi\lor\psi$ is a formula,
+    \item $\varphi\boxright\psi$ is a formula,
+    \item $B_i\varphi$ is a formula,
+    \item $\X\varphi$ is a formula,
+    \item $\Y\varphi$ is a formula, and
+    \item $\square\varphi$ is a formula.
+\end{itemize}
+Nothing else is a formula.
+
+$\lnot$ and $\lor$ are defined as usual, and $\boxright$ represents a counterfactual conditional. $\varphi\boxright\psi$ is read as ``If $\varphi$ were true (now), then $\psi$ would be true (now).'' $B_i$ is a belief operator, with $B_i\varphi$ being read as ``Player $i$ believes that $\varphi$ is true.'' $\X$ is a temporal operator, with $\X\varphi$ being read as ``$\varphi$ will be true after this move.'' $\Y$ is the past counterpart of $\X$, with $\Y\varphi$ being read ``$\varphi$'' was true immediately before this move.'' $\square\varphi$ is read as ``$\varphi$ is necessarily true at this point in the game.''
+\subsection{Abbreviations}
+\begin{align*}
+    \top&:=\lnot\bot&B^E\varphi&:=\bigwedge_{i\in\Agt}B_i\varphi\\
+    \varphi\land\psi&:=\lnot(\lnot\varphi\lor\lnot\psi)&\widehat{B}_i\varphi&:=\lnot B_i\lnot\varphi\\
+    m_i&:=m\land\turn_i\text{\quad}(m\in\Act)&\diamond\varphi&:=\lnot\square\lnot\varphi\\
+    \varphi\boxiff\psi&:=(\varphi\boxright\psi)\land(\psi\boxright\varphi)&\beg&:=\square\lnot\Y\top\\
+    \varphi\Diamondright\psi&:=\lnot(\varphi\boxright\lnot\psi)&\fin&:=\square\lnot\X\top\\
+    &&\AX\varphi&:=\lnot\fin\land\bigwedge_{m\in\Act}(m\boxright\X\varphi)
+\end{align*}
+
+$\top$ represents truth. $\varphi\land\psi$  is read, naturally, as ``$\varphi$ is true and $\psi$ is true.'' $m_i$ should be read as ``Player $i$ plays move $m$ this turn.'' $\varphi\boxiff\psi$ should be read as ``If either of $\varphi$ or $\psi$ were true\footnote{I mean this is an stronger sense than ``If $\varphi\lor\psi$ were true...''.}, then both would be true.'' Note, however, that since contraposition is not valid for counterfactuals, $(\varphi\boxiff\psi)\boxiff(\lnot\varphi\boxiff\lnot\psi)$ is not in general valid. $\varphi\Diamondright\psi$ should be read as ``If $\varphi$ were true, then $\psi$ might also be true.'' $B^E\varphi$ should be read as ``Everyone believes $\varphi$.''  $\widehat{B}_i$ is the dual of $B_i$, and $\widehat{B}_i\varphi$ should be read as ``Player $i$ considers $\varphi$ to be plausible.'' $\diamond$ is the dual of $\square$, and $\diamond\varphi$ is read as ``There is a possible playthrough of the game where $\varphi$ is true at the current node.'' $\beg$ should be read as ``This is the start of the game'' and $\fin$ should be read as ``The game has ended.'' $\AX\varphi$ should be read as ``Whatever move is played now, $\varphi$ will be true next turn.''
+\section{Semantics}
+\subsection{Strategic Structures}
+To describe a specific finite perfect-information extensive-form (henceforth ``FPIE'') game, we define a ``strategic structure'' $T$ as follows:
+\begin{equation*}
+    T = \langle V,\EV,Q,\PM,\nx\rangle
+\end{equation*}
+where $V \ne\emptyset$ is a finite set of nodes, $\EV\subset V$ is the set of outcome nodes (i.e. no decisions to be made), $Q:V\longmapsto\Agt$ is a partial function assigning a player to each decision node, $\PM:V\longmapsto\mathcal P(\Act)$ is a total function assigning a set of possible actions to each node, and $\nx:V\times\Act\longmapsto V$ is a function which, given a node and a move, returns the successor node (if there is one). We impose the following further requirements on the strategic structure:
+\begin{enumerate}
+    \item $Q(w)$ is undefined if and only if $w\in\EV$,
+    \item $\PM(w)=\emptyset\longleftrightarrow w\in\EV$,
+    \item $\nx(w,m)$ is defined if and only if $m\in\PM(w)$,
+    \item $\forall w\in V.\forall m\in\Act.\nx(w,m)\ne w$,
+    \item $(\nx(w,m)=\nx(w',m'))\longleftrightarrow((w=w')\land(m=m'))$
+    \item $\forall w\in\EV.\exists v\in V.\exists m\in\Act.w =\nx(v,m)$, and
+    \item $\exists! w\in V.\forall v\in V.\forall m\in\Act.(\nx(v,m)\ne w)$
+\end{enumerate}
+
+Condition 1 says that it is no player's turn at node $w$ if and only if the game has ended at $w$. Condition 2 says that there are no possible moves if and only if the game has ended. Condition 3 says that node $w$ has an $m$-successor in the game tree if and only if $m$ is a possible move at $w$. Condition 4 says that no node has a move which leads directly to the same node. Condition 5 says that no node can be reached in more than one way. Condition 6 says that every outcome node is the result of some move $m$ at some decision node $v$. Condition 7 says that there is exactly one node which has no predecessors.
+
+\subsubsection{Does this structure describe a FPIE game?}
+
+Taking condition 3 together with condition 2, we get that all and only the outcome nodes have no successors. Conditions 4 and 5 together mean that no loops can occur in the game tree. Because $V$ is finite and there are no loops, we also have that $\EV\ne\emptyset$, and since $\EV\subset V$, we know that $V$ contains at least one decision and at least one outcome node. Furthermore, because both $V$ and $\Act$ are finite, the game tree is finite. Finally, because of condition 6, we know that the unique node with no predecessors from condition 7 is not an outcome node, and therefore is the initial node of the game tree. Every path starting from this node and ending in an outcome node represents a unique playthrough of the game. Because the game tree is finite, there is a maximal length of a playthrough. All of this means that the tree described by the strategic structure $T$ in fact represents some finite extensive-form game. Because $\nx$ is functional and is undefined for the outcome nodes, there are no moves by nature. Hence, the game is finite and the outcome is determined solely by the moves of the players, and because $Q$ is functional, it is only ever up to one player's turn. Provided the players know the structure of the game tree (which would be captured by the game model introduced later), this would be a FPIE game.
+\subsubsection{Does this capture every FPIE game?}
+We know that what the strategic structure describes is a FPIE game. But are there any FPIE games which do not meet the conditions of our strategic structures? Let us consider the conditions in turn. Do the conditions on the strategic structure exclude any FPIE games from description? No game has an empty set of nodes, as decisions and outcomes are needed to describe a game, so $V\ne\emptyset$. If $\EV=V$, this would not be a game in any meaningful sense, so we have to have $\EV\subset V$. Unless the game has ended, an FPIE game always has exactly one player making a move at a time, so $Q$ would have to be functional. There is always a set of possible moves on every turn in a game, so $\PM$ makes sense. And a in a perfect-information game, a move always uniquely determines what immediately follows, so $\nx$ would be functional. Now, let us move on to the numbered conditions.
+
+If an FPIE game has ended, then it is no player's turn, so $w\in\EV$ should imply $Q(w)$ being undefined. And if it is no player's turn, a FPIE cannot progress, so must have ended. So condition 1 is always satisfied. Similarly, a complete lack of available moves can only mean that a FPIE game has ended, and if there were available moves, the game could not have ended, so condition 2 is always satisfied. A FPIE game defines what happens on a given turn if move $m$ is played if and only if move $m$ can actually be played, i.e. $\nx(w,m)\in V\longleftrightarrow m\in\PM(w)$, so condition 3 is also satisfied by every FPIE game. Suppose a game satisfied condition 4, i.e. the game has a turn at which playing a certain move leads to the very same turn. Then the game can loop infinitely at this turn, so it is not finite. Hence, every FPIE game satisfied condition 4.
+
+Condition 5 is not strictly necessary for a FPIE game, as it is possible for a game to reach the same point (be it a turn or outcome) by more than one path. However, this can be represented by having identical subtrees instead of having merging branches, so every FPIE game can still be described in the strategic structure even if paths ``merge'' in some sense. So condition 5 does not exclude any FPIE games. Condition 6 is similarly not strictly necessary. A game can describe outcomes which are not actually reachable in the game. However, if this is the case, the game can equally well be described without these outcomes. So condition 6 does not exclude any FPIE games. Finally, condition 7 says that there is a unique initial node to any game. Suppose we have a game with at least two distinct starting points. There are three possible ways to interpret this: (i) the game that is actually played is a specific subgame of the game as currently described, always starting from the same first turn, (ii) there is a choice for which starting turn to play from, in which case, the game can be redescribed with this choice as the real first turn, or (iii) the players do not know which first turn they are playing from. In cases (i) and (ii), we can still find an equivalent FPIE game which meets condition 7. In case (iii), we do not actually have a FPIE game in the first place. Thus, every FPIE game can be described in such a strategic structure.
+\subsection{Game Model}
+\begin{equation*}
+    M = \langle T,\Gamma, H, F, \pi, \{R^w\mid w\in V\},\{\{\yr_i^w\mid w\in V\}\mid i\in\Agt\},\{P_i\mid i\in\Agt\}\rangle
+\end{equation*}
+
+A game model $M$ is composed of a strategic structure $T$, a finite set of possible worlds $\Gamma$, a history function $H$, a premise function $F$, a valuation function $\pi$, a set of accessibility relations $R^w$ for $\square$, a set of doxastic accessibility relations $\yr_i^w$ for each player $i$, and a payoff function $P_i$ for each player. We require that $\lvert\Gamma\rvert\ge\lvert\EV\rvert$.
+
+The history function $H:\Gamma\longmapsto((V\times\Act)^+\times\EV)$ assigns a ``history'' to each possible world. A history is a (non-empty) finite sequence of decision node-move pairs $\langle (w_0,m_0),\dots,(w_e,m_e)\rangle$ together with an outcome node $w_{e+1}\in\EV$. A history must meet the following conditions:
+\begin{enumerate}
+    \item $w_0$ is the unique initial decision node of the game,
+    \item $m_j\in\PM(w_j)$ for every $j=0,\dots,e$, and
+    \item $\nx(w_j,m_j) = w_{j+1}$ for every $j=0,\dots,e$.
+\end{enumerate}
+Thus, a history specifies the complete progression of the game that actually occurs in a given possible world. Let $V_{\gamma}$ denote the set of vertices reached in world $\gamma$ according to $H(\gamma)$. I.e., for $H(\gamma) = \langle\langle(w_0,m_0),\dots,(w_e,m_e)\rangle,w_{e+1}\rangle$, $V_{\gamma}=\{w_0,\dots,w_e,w_{e+1}\}$. We additionally require of $H$ that for every $w\in\EV$, there is at least one $\gamma\in\Gamma$ with $w\in V_{\gamma}$. This is to ensure that every theoretically possible outcome of the game is actually captured in the model.\footnote{Without this requirement, consider a game $\mathcal G$ with game model $M$. Suppose that for at least one $w\in\EV$ such that, for every $\gamma\in\Gamma$, $w\notin V_{\gamma}$. Then, as far as model $M$ is concerned, $w$ is not a possible outcome of the game. Then in this sense, $M$ can be better thought of as a model of a game $\mathcal G'$, a modification of $\mathcal G$ that excludes every outcome node not possibly reached in $M$.}
+
+Let $\mathcal I:=\bigcup\{\{(\gamma,w)\mid w\in V_{\gamma}\}\mid\gamma\in\Gamma\}$, i.e. the set of world-vertex pairs where the vertex is actually reached in the given world. We take a proposition to be a subset of $\mathcal I$. 
+$\pi:\Prop\longmapsto\mathcal P(\mathcal I)$ assigns a proposition to each propositional variable. Propositional variables are thus allowed to vary across possible worlds as well as over the branching time of the game tree\footnote{One might also wish to restrict this so that propositional variables are determined only by the structure of game, similarly to how $\turn_i$ and $\fin$ are determined only the strategic structure. This could be achieved by adding the requirement that if, for any $\gamma\in\Gamma$, $w\in V$, and $p\in\Prop$, if $(\gamma,w)\in\pi(p)$, then $(\beta,w)\in\pi(p)$ for every $\beta\in\Gamma$. This is a subclass of the models described here, so we keep with the more general form. The branching time logic introduced by \cite{Pri67} included both kinds of propositional variables.}. The payoff function $P_i:\EV\longmapsto N$ assigns an ordinal-utility payoff for player $i$ at every outcome node.
+
+$R^w\subseteq\Gamma^2$ is the accessibility relation for $\square$ at vertex $w$. We take $R^w :=\{(\beta,\gamma)\in\Gamma^2\mid w\in V_{\gamma}\cap V_{\beta}\}$ This will mean that when evaluating a formula $\square\varphi$ at node $w$, $\varphi$ is evaluated at all and only the possible worlds which actually reach the node in question.
+
+The premise function $F:(\Gamma\times V)\longmapsto\mathcal P(\mathcal P(\mathcal I)))$ assigns a set of propositions (the ``premises'') to each possible world-vertex pair. We require the following restrictions on $F$:
+
+\begin{enumerate}
+    \item $\forall\gamma\in\Gamma.\forall w\in V.\bigcap F(\gamma,w)=\{(\gamma,w)\}$\quad(Centering)
+    \item $\forall\beta,\gamma\in\Gamma.(w\in V_{\beta})\longrightarrow ((\beta,w)\in\bigcup F(\gamma,w))$\quad(Contemporary Universality)
+\end{enumerate}
+Centering says that for any world-vertex pair $(\gamma,w)$, the only world-vertex pair which is in all the premises assigned by $F(\gamma,w)$ is $(\gamma,w)$. Contemporary universality says that every world which reaches node $w$ is in at least one premise from $F(\gamma,w)$. The inclusion of contemporary universality will be motivated in section 2.3.
+
+Let $\llbracket\varphi\rrbracket$ denote the proposition expressed by $\varphi$ (i.e. the set of world-vertex pairs where $\varphi$ is satisfied). We say that a world $\gamma'$ is maximally $\varphi$-consistent with world $\gamma$ at vertex $w$ if:
+\begin{enumerate}
+    \item $(\gamma',w)\in \llbracket\varphi\rrbracket$ and
+    \item there is a non-empty set $G\subseteq F(\gamma,w)$ where
+    \begin{enumerate}
+        \item $(\gamma',w)\in\bigcap G$ and
+        \item For every set $G'$ with $G\subset G'\subseteq F(\gamma,w)$, $\varphi$ and $G'$ are inconsistent, i.e. $(\bigcap G')\cap \llbracket\varphi\rrbracket = \emptyset$.
+    \end{enumerate}
+\end{enumerate}
+We will let $\max_{F(\gamma,w)}^{\varphi}(\Gamma)$ denote the set of worlds maximally $\varphi$-consistent with $\gamma$ at $w$. Note that centering guarantees that if $(\gamma,w)\in\llbracket\varphi\rrbracket$, then $\max_{F(\gamma,w)}^{\varphi}(\Gamma)=\{(\gamma,w)\}$.
+
+Each player $i$ has a set of doxastic accessibility relations, $\{\yr_i^w\mid w\in V\}$, where $\yr_i^w\subseteq\Gamma^2$. We use $\gamma\yr_i^w\delta$ to denote that world $\delta$ is doxastically accessible from world $\gamma$ for player $i$ at node $w$. Intuitively, the set $\yr_i^w(\gamma) = \{\delta\in\Gamma\mid\gamma\yr_i^w\delta\}$ is the set of worlds player $i$ considers plausible when at node $w$ and in world $\gamma$. For every $w\in V$, we impose the following restrictions:
+\begin{enumerate}
+    \item If $w\notin V_{\gamma}$, then $\{\beta\mid\beta\yr_i^w\gamma\}=\emptyset$\quad(Presence)
+    \item If $w\in V_{\gamma}$, then$\yr_i^w(\gamma)\ne\emptyset$\quad(Present Seriality)
+    \item If $\alpha\yr_i^w\beta$ and $\beta\yr_i^w\gamma$, then $\alpha\yr_i^w\gamma$\quad(Transitivity)
+    \item If $\alpha\yr_i^w\beta$ and $\alpha\yr_i^w\gamma$, then $\beta\yr_i^w\gamma$\quad(Euclideanness)
+    \item If $Q(w) = i$, then $\{\Mv(\delta,w)\mid\delta\in\yr_i^w(\gamma)\}=\{\Mv(\gamma,w)\}$\quad(Self-Awareness)
+\end{enumerate}
+For every $w\in V$, for every world $\gamma$, if $\Mv(\gamma,w) = m\in\Act$ and $w'=\nx(w,m)$, we impose the following further restrictions:
+\begin{enumerate}[resume]
+    \item $\yr_i^{w'}(\gamma) \subseteq \bigcup\{\max_{F(\delta,w)}^m(\Gamma)\mid\delta\in\yr_i^w(\gamma)\}$\quad(Minimal Revision)
+    \item If $\{\Mv(\delta,w)\mid\delta\in\yr_i^w(\gamma)\}=\{m\}$, then $\yr_i^w(\gamma)=\yr_i^{w'}(\gamma)$\quad(Expectational Continuity)
+    \item $\yr_i^w(\gamma) = \bigcup\{\yr_i^w(\delta)\mid\delta\in\yr_i^{w'}(\gamma)\}$\quad(Recall)
+\end{enumerate}
+
+Presence says that no world which does not reach the current node in the game tree is considered plausible. Present Seriality says at least one world is considered plausible at $w$ in $\gamma$ if $w$ is reached in $\gamma$. Transitivity and Euclideanness are as usual. Self-Awareness says that, on a player $i$'s turn, no world in which $i$ makes a move other than the one they actually make is considered plausible by $i$. Minimal revision says that every world a player considers plausible next turn at $w'$ is maximally $m$-consistent at $w$ with a world they consider plausible this turn, where $m$ is the move that is actually played this turn at $w$. Expectational continuity says that, if what a player believed would happen this turn actually happens, they will deem exactly the same worlds plausible next turn. Recall says that, if a world $\delta$ is considered plausible this turn, then were they in $\delta$, they would have deemed exactly the same worlds plausible last turn as they actually did.
+\subsection{Satisfaction}
+Let $\Mv(\gamma,w)=m$ if $(w,m)\in H(\gamma)$ and undefined otherwise. Take a game model $M$, a possible world $\gamma$, and a vertex $w$ such that $w\in V_{\gamma}$\footnote{In the Ockhamist interpretation of branching-time temporal logic, truth at a point in time is relativized to a history (a complete path through the tree of time) passing through that point in time. In our setup, this is analgous to relativizing to a possible world whose assigned history contains the vertex in question.}. We then defined satisfaction on a pointed model $M,\gamma,w$ as follows:
+
+\begin{tabular}{l l l}
+    $M,\gamma,w\not\Vdash\bot$\\
+    $M,\gamma,w\Vdash p$&iff&$(\gamma,w)\in\pi(p)$\\
+    $M,\gamma,w\Vdash\turn_i$&iff&$Q(w)=i$\\
+    $M,\gamma,w\Vdash m$&iff&$(m,w)\in H(\gamma)$\\
+    $M,\gamma,w\Vdash k_i$&iff&$P_i(w_{e+1})=k$, where\\
+    &&$H(\gamma)=\langle\langle(w_0,m_0),\dots,(w_e,m_e)\rangle,w_{e+1}\rangle$\\
+    $M,\gamma,w\Vdash\lnot\varphi$&iff&$M,\gamma,w\not\Vdash\varphi$\\
+    $M,\gamma,w\Vdash\varphi\lor\psi$&iff&$M,\gamma,w\Vdash\varphi$ or $M,\gamma,w\Vdash\psi$\\
+    $M,\gamma,w\Vdash B_i\varphi$&iff&$w\in V_{\gamma}$ and $M,\mu,w\Vdash\varphi$ for every\\
+    &&world $\mu$ such that $\gamma\yr_i^w\mu$\\
+    $M,\gamma,w\Vdash\X\varphi$&iff&$M,\gamma,w'\Vdash\varphi$, where\\
+    &&$w'=\nx(w,\Mv(\gamma,w))$\\
+    $M,\gamma,w\Vdash\Y\varphi$&iff&$M,\gamma,w'\Vdash\varphi$, where\\
+    &&$w=\nx(w',\Mv(\gamma,w'))$\\
+    $M,\gamma,w\Vdash\square\varphi$&iff&$M,\beta,w\Vdash\varphi$ for every world $\beta$ such that\\
+    &&$\gamma R^w\beta$\\
+    $M,\gamma,w\Vdash\varphi\boxright\psi$&iff&$M,\beta,w\Vdash\psi$ for every world $\beta\in\max_{F(\gamma,w)}^{\varphi}(\Gamma)$
+\end{tabular}
+
+Satisfaction for the propositional elements of the language corresponds to satisfaction in propositional logic: $\bot$ is never satisfied, $\lnot\varphi$ is satisfied whenever $\varphi$ isn't satisfied, and $\varphi$ is satisfied whenever at least one of the disjuncts is satisfied. The abbreviations $\top$, $\land$, and $m_i$ match our intuitions: $\top$ is always satisfied, $\varphi\land\psi$ is satisfied when both $\varphi$ and $\psi$ are satisfied, and $m_i$ is satisfied when it is player $i$'s turn and the move made this turn (by $i$) is $m$.
+
+$\turn_i$ is satisfied exactly when it is player $i$'s turn at the current node. $m$ is satisfied exactly when the world's history dictates that move $m$ is made this turn. $k_i$ is satisfied exactly the history ends in an outcome node whose payoff for $i$ is $k$.
+
+$B_i\varphi$ is satisfied when, in every world considered plausible by player $i$, $\varphi$ holds at the current node. The abbreviation $\widehat{B}_i$ matches our intuition: if $M,\gamma,w\Vdash\lnot B_i\lnot\varphi$, there must be at least one world which $i$ considers plausible where $\varphi$ is true, so player $i$ should consider $\varphi$ plausible.
+
+$\X\varphi$ is satisfied when the current node is a decision node and the move taken here, as dictated by the world's history, leads to a node where $\varphi$ is true. $\Y\varphi$ is satisfied when the current node was preceded by a decision node at which $\varphi$ held in the given world. $\square\varphi$ is satisfied exactly when $\varphi$ holds in every world whose history reaches the current node.  If $M,\gamma,w\Vdash\lnot\square\lnot\varphi$, then there must be some world $\beta$ with $w\in V_{\beta}$ where $M,\beta,w\not\Vdash\lnot\varphi$, i.e. $M,\beta,w\Vdash\varphi$. Thus, our intuition for $\diamond$ is correct: $\diamond\varphi$ is satisfied when it is possible for $\varphi$ to be true at this point in the game.
+
+If $w\in\EV$, then we will have $M,\gamma,w\Vdash\square\lnot\X\top$, as no world which reaches $w$ reaches any point after $w$. If $w\notin\EV$, we know that the world must progress past $w$, and so we will have $M,\gamma,w\Vdash\X\top$. Thus, the abbreviation $\fin$ captures, as desired, exactly the outcome nodes. If $w$ is the unique starting node of the game tree, then we will have $M,\gamma,w\Vdash\square\lnot\Y\top$, as no possible world is ever at a point before $w$. If $w$ is not the unique starting node, we know this world had to pass through a decision node preceding $w$, and so we will have $M,\gamma,w\Vdash\diamond\Y\top$. Thus, the abbreviation $\beg$ captures, as desired, exactly the unique starting node of the game.
+
+Finally, we reach the conditional $\varphi\boxright\psi$. Each world-vertex pair $(\gamma,w)$ is assigned a set of premises $F(\gamma,w)$. The centering requirement on $F$ means that, for every $\chi\in F(\gamma,w)$, we have $M,\gamma,w\Vdash\chi$ and that for every other world-vertex pair $(\beta,v)$, there is at least one $\chi\in F(\gamma,w)$ such that $M,\beta,v\not\Vdash\chi$. $M,\gamma,w\Vdash \varphi\boxright\psi$ if every world reaching $w$ which is maximally $\varphi$-consistent with $\gamma$ at $w$ also satisfies $\psi$ at $w$.
+If $M,\gamma,w\Vdash\varphi$, then $(\gamma,w)$ is itself maximally $\varphi$-consistent, and, by centering, no other world-vertex pair is. In this case, $M,\gamma,w\Vdash\varphi\boxright\psi$ when $M,\gamma,w\Vdash\psi$. If there is no world which is $\varphi$-consistent with $F(\gamma,w)$ at $w$, then the conditional is satisfied vacuously. Our abbreviations also make sense with our intuitions: if $M,\gamma,w\Vdash\lnot(\varphi\boxright\lnot\psi)$, then there is a world maximally $\varphi$-consistent with the premises of $\gamma,w$ where $\psi$ is true, so $\varphi$ being true might mean that $\psi$ is true. If $M,\gamma,w\Vdash(\varphi\boxright\psi)\land(\psi\boxright\varphi)$, then every world maximally $\varphi$-consistent with the premises of $\gamma,w$ is also a $\psi$ world and every world maximally $\psi$-consistent with the premises of $\gamma,w$ is also a $\psi$ world, so either one being true would mean the other is also true.
+
+To motivate the requirement of contemporary universality, take a world $\gamma$ with $M,\gamma,w\Vdash m$. Take any $m'\in\PM(w)$ with $m'\ne m$ and consider whether $M,\gamma,w\Vdash m'\boxright\varphi$. Suppose the model $M$ admits at least one world $\beta$ with $M,\beta,w\Vdash m'$. Without some form of universality, there would be no guarantee that any world would be $m'$-consistent with \textit{any} subset of $F(\gamma,w)$, making any such counterfactual vacuously true. Contemporary universality says that every such $\beta$ is $m'$-consistent with a non-empty subset of $F(\gamma,w)$, so there will be at least one world which is \textit{maximally} $m'$-consistent with $F(\gamma,w)$. Thus, fewer counterfactual conditionals will be vacuously true, and making the system better at capturing counterfactual reasoning in a game.
+\subsection{Characteristics of Belief ($B_i$)}
+The standard axioms for modal operators utilize the material conditional $\longrightarrow$. Since we are interested in counterfactual, rather than material, conditionals, the axioms need to be rewritten with $\boxright$ instead. The valid counterfactual belief axioms are shown below:
+\begin{gather}
+    (B_i(\varphi\boxright\psi)\land B_i\varphi)\boxright\psi\tag{Counterfactual K$'$}\\
+    B_i\varphi\boxright \widehat{B}_i\varphi\tag{Counterfactual D}\\
+    B_i\varphi\boxright B_iB_i\varphi\tag{Counterfactual 4}\\
+    \widehat{B}_i\varphi\boxright B_i\widehat{B_i}\varphi\tag{Counterfactual 5}
+\end{gather}
+Note that we have Counterfactual K$'$, instead of K. This is because the counterfactual translation of the standard form of the K axiom, $B_i(\varphi\boxright\psi)\boxright(B_i\varphi\boxright B_i\psi)$, is invalid. Because of this, Counterfactual K$'$ is instead the counterfactual translation of a classically equivalent formulation of K. Counterfactual variants of the T and B axioms are invalid, as befits a logic of belief: belief can be mistaken, so we want agents who can believe something false (contra T) and also believe $\varphi$ is implausible when it is in fact true (contra B).
+
+Positive introspection, the notion that if an agent believes $\varphi$, then they believe that they believe $\varphi$, corresponds exactly to the Counterfactual 4 axiom. Negative introspection, the notion that if an agent does \textit{not} believe $\varphi$, then they believe that they do not believe $\varphi$, in our language $\lnot B_i\varphi\boxright B_i\lnot B_i\varphi$, can easily be shown to correspond the Counterfactual 5 axiom by substituting $\lnot\varphi$ in the place of $\varphi$ in negative introspection. The combination of the D and 5 axioms also means the Counterfactual C4 axiom, below, is valid.
+\begin{equation}
+    B_iB_i\varphi\boxright B_i\varphi\tag{Counterfactual C4}
+\end{equation}
+This together with Counterfactual 4 means that $B_i\varphi\boxiff B_iB_i\varphi$ is valid. 
+
+A particularly important aspect of $B_i$ not corresponding to any axiom is shown below.
+\begin{equation}
+    B_im_i\boxiff m_i\tag{Intentional Awareness}
+\end{equation}
+Essentially, this requires that, when players make a move, they know what move they will make and also do not accidentally make a move other than the one they intended. Combining this with the expectation-continuity requirement on players' plausibility orderings, this means that if the previous move was what they expected, they previously planned on making this move. If the previous move did surprise them, however, there is some latitude allowed for the player not to know before this turn what move they will make. In these cases, it makes sense to interpret the model as evaluating the truth values of formulae, if the game has not yet ended, at the moment a move is being made, in which case a player would have made up their mind.
+\subsection{Characteristics of Necessity ($\square$)}
+Suppose $M,\gamma,w\Vdash\square\varphi$. This means that at every world $\beta\in\Gamma$ with $w\in V_{\beta}$, we have $M,\beta,w\Vdash\varphi$. Therefore, $M,\alpha,w\Vdash\square\varphi$ for every $\alpha\in\Gamma$. Because of this, many counterfactuals with $\square$ in the antecedent collapse to a material conditional.\footnote{The exceptions to this would involve a dis-/conjunction not in the scope of a $\square$, with at least one dis-/conjunct not containing a square. For example, $\square(p\land q)\boxright r$ would collapse, but $(\square p\land q)\boxright r$ would not, and neither would $(\square p\lor q)\boxright r$. This also means that something like $(\square p\boxright q)\boxright r$ would not collapse overall, as the antecedent would collapse to $(\lnot\square p\lor q)$, which has a disjunct not in the scope of a $\square$.} To avoid confusion with $\boxright$, we present these axioms using $\lnot\varphi\lor\psi$ to represent the material conditional:
+\begin{gather}
+    \lnot\square(\lnot\varphi\lor\psi)\lor(\lnot\square\varphi\lor\square\psi)\tag{K}\\
+    \lnot\square\varphi\lor\varphi\tag{T}\\
+    \square\varphi\lor\square\lnot\square\varphi\tag{5}
+\end{gather}
+Thus, $\square$ is an S5 operator. This means that the D, B, 4, C, and C4 axioms are all also valid.
+
+\subsubsection{Interaction Between $B_i$ and $\square$}
+\begin{gather*}
+    \lnot B_i\square\varphi\lor\varphi\\
+    \lnot B_i\square\varphi\lor\square\varphi\\
+    \lnot\square\varphi\lor B_i\square\varphi\\
+    \lnot B_i\square\varphi\lor\square B_i\varphi\\
+    \lnot B_i\square\varphi\lor\square B_i\square\varphi
+\end{gather*}
+
+Although these might be problematic for a general model of belief interacting with necessity, since we are looking specifically at games of \textit{perfect information}, this should not be worrying. All the information about the game is perfectly transparent to the players. Because of this, a player should not believe something is necessarily true unless it is in fact necessarily true based on the structure of the game and the past moves, which yields the principle $\lnot B_i\square\varphi\lor\square\varphi$. If $\varphi$ is necessarily true, then it must be true now, yielding $\lnot B_i\square\varphi\lor\varphi$. Similarly, if $\varphi$ is necessarily true at $w$ in the game, the transparency of information means a reasoning agent ought to be able to arrive at that conclusion, and should always arrive at that conclusion. This yields the principles $\lnot\square\varphi\lor B_i\square\varphi$ and $\lnot\square\varphi\lor B_i\varphi$. Combining the latter principle with $\lnot B_i\square\varphi\lor\square\varphi$, we get $\lnot B_i\square\varphi\lor\square B_i\varphi$. Furthermore, if an agent believes $\varphi$ to be necessarily true, the information about the game which leads to that belief in one world should lead to that belief in every world. Hence, we get the principle $\lnot B_i\square\varphi\lor\square B_i\square\varphi$.
+\subsection{Characteristics of Temporal Operators ($\X$ and $\Y$)}
+\begin{gather}
+    (\X(\varphi\boxright\psi)\land\X\varphi)\boxright\X\psi\tag{Counterfactual K$'_{\X}$}\\
+    \X\lnot\varphi\boxiff(\X\top\land\lnot\X\varphi)\tag{Conditioned FUNC$_{\X}$}\\(\Y(\varphi\boxright\psi)\land\Y\varphi)\boxright\Y\psi\tag{Counterfactual K$'_{\Y}$}\\
+    \Y\lnot\varphi\boxiff(\Y\top\land\lnot\Y\varphi)\tag{Conditioned FUNC$_{\Y}$}
+\end{gather}
+The standard functional axiom for the next ($\X$) and yesterday ($\Y$) operators is $\text{T}\,\lnot\varphi\longleftrightarrow\lnot\text{T}\,\varphi$, for $\text{T}\in\{\X,\Y\}$. Replacing $\longleftrightarrow$ with $\boxiff$, this would not be valid in DCLEG. If $w\notin V_{\gamma}$, then we can have $M,\gamma,w\Vdash\lnot\text{T}\,\varphi$ without having $M,\gamma,w\Vdash\text{T}\,\lnot\varphi$. For this reason, the axiom has to be conditioned to include $\text{T}\,\top$ on the right-hand side of the biconditional, yielding the axioms shown above.
+\subsubsection{Interaction Between $B_i$ and $\X$}
+Due to Expectational Continuity, the following biconditional is valid:
+\begin{equation*}
+    (m\land B_im\land B_i\X\varphi)\boxiff(m \land B_im\land \X B_i\varphi)
+\end{equation*}
+Thus, if a player's correctly believes move $m$ will be played this turn, then they believe $\varphi$ will be true at the next node if and only if they will actually believe $\varphi$ at the next node. To explain why this is desirable, suppose it is player 1's turn, player 2 believes player 1 will play move $m$, and player 2 believes that, afterwards, $\varphi$ will be true. Player 1 then plays $m$, as player 2 expected. Player 2 has not received any information which ran counter to their beliefs, and thus their prior beliefs seem to dictate that they should now believe $\varphi$ is true. To state this succinctly, an agent should only change their relative credences when confronted with counterevidence. In this context, all evidence comes in the form of a move made. If two possible worlds $\alpha$ and $\beta$ both presuppose move $m$ being made, then move $m$ being made does not present any new evidence against $\alpha$ or against $\beta$, so no change in relative credence is warranted. Although an agent may in principle change their beliefs without any new evidence, all models require some degree of idealization. In the limited context of a game, where we are often interested in ideally rational and logically omniscient (i.e. beliefs are closed under entailment) agents, assuming this sense of temporal stability seems eminently reasonable. Indeed, I see significant costs to not assuming this temporal stability. If agents were allowed to change their relative credences without counterevidence, it might make more sense to treat each agent as only acting at most one decision node. This is often done in the game theoretic literature, but I believe it is an over-idealization. Many of the real-world situtations game theory seeks to model, be they literal games or not, involve the same ``players'' acting at different times. By treating the players at each node as distinct, there is no way to take into account the learning that can happen as players observe each others' behavior.
+
+As a consequence of Expectational Continuity and Minimal Revision, the following conditional is valid in DCLEG:
+\begin{equation*}
+    B_i\AX\varphi\boxright\X B_i\varphi
+\end{equation*}
+This says that if a player believes that, regardless of what move is played, $\varphi$ will be true next, then they will actually believe $\varphi$ next. This can be motivated similarly to the preceding biconditional for $\X$ and $B_i$. If player $i$ believes that $\varphi$ will be true after any move is played, then the playing of some move $m$ ought not to change their convictions, and so they should believe that $\varphi$ is now true.
+\subsubsection{Interaction Between $B_i$ and $\Y$}
+Due to recall, the following biconditional is valid:
+\begin{equation*}
+    B_i\Y B_i\varphi\boxiff\Y B_i\varphi
+\end{equation*}
+This means that agents will always correctly remember what they believed in previous turns of the game. There may, however, be differences about what they now believe was true last round and what they believed last round was true.
+\subsection{Some Validities}
+Table 1 of \cite{LoMo11} listed many valid formulae and principles in ELEG. I have adapted as many of these as possible into valid formulae of DCLEG, presented in Table \ref{tab:Vlds}. In addition to these and the validities discussed prior for the modal operators, all principles of classical propositional logic are preserved. 
+
+\begin{table}
+    \centering
+    \begin{gather}
+    (\X(\varphi\boxright\psi)\land\X\varphi)\boxright\X\psi\tag{Ctf. K$'$$_{\X}$}\\
+    (\AX(\varphi\boxright\psi)\land\AX\varphi)\boxright\AX\psi\tag{Ctf. K$'$$_{\AX}$}\\
+    \X\top\boxright(\X\varphi\lor\X\lnot\varphi)\tag{Det$_{\X}$}\\
+    \square\varphi\boxright B_i\varphi\tag{PerfectInfo}\\
+    \square\X\square\varphi\boxiff\AX\square\varphi\tag{NxtVert}\\
+    \turn_i\boxright\square\turn_i\tag{TurnStr}\\
+    (\AX\varphi\land\X\top)\boxright\X\varphi\tag{TimeVert}\\
+    m_i\boxiff B_im_i\tag{Aware}\\
+    \bigvee_{k\in N}k_i\tag{CompletePref}\\
+    k_i\boxright\lnot h_i\text{\quad if\quad} k\ne h\tag{SinglePref}\\
+    \fin\lor\bigvee_{m\in\Act}m\tag{OneAct}\\
+    m\boxright\lnot m'\text{\quad if\quad} m\ne m'\tag{SingleAct}\\
+    \fin\lor\bigvee_{i\in\Agt}\turn_i\tag{TurnTaking}\\
+    \lnot\turn_i\lor\lnot\turn_j\text{\quad if }i\ne j\tag{SingleTurn}\\
+    \fin\lor(k_i\boxiff \X k_i)\tag{TimePref}\\
+    (\X\fin\land m\land k_i)\boxright\square(m\boxright k_i)\tag{End Act}\\
+    (m\land\X\square\varphi)\boxright\square(m\boxright\X\varphi)\tag{StrAct}
+\end{gather}
+    \caption{Some Validities of DCLEG}
+    \label{tab:Vlds}
+\end{table}
+\subsubsection{Notes on Comparisons between ELEG and DCLEG}
+The $\AX$ operator from ELEG had to be omitted in the basic syntax, since I have not defined moves taken at nodes not actually reached. Instead, I have reformulated it as a conjunction of counterfactuals. It therefore behaves differently than the $\AX$ in ELEG.\footnote{Its relationship with $\X$ has also changed. In DCLEG, $\AX\varphi$ can be true even when $\X\varphi$ is not. This happens when the node in question is not reached in the actual world, but is not an outcome node. In this case, because no move is made at that node, a counterfactual shift has to happen for every move in order to evaluate $\AX\varphi$.} The formula $[K_i]\AX\varphi\longleftrightarrow\AX[K_i]\varphi$, termed Perm$_{[K_i],\AX}$, was one of the given validities of ELEG. Translating this into DCLEG would give something akin to $B_i\AX\varphi\boxiff\AX B_i\varphi$. This is invalid, due, at least in part, to the now counterfactual nature of $\AX$. I have also introduced a new temporal operator $\Y$ (the ``yesterday'' operator), which behaves analagously to $\X$ with regards to the past. Since the past, unlike the future, is always linear (i.e. non-branching) in a game, there can be no past analogue of $\AX$.
+\end{document}

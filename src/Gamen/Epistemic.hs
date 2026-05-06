@@ -1,9 +1,9 @@
--- | Epistemic logics (Chapter 15, B&D / BdRV).
+-- | Epistemic logics (Chapter 13, B&D Fall 2019 / BdRV §1.4).
 --
 -- Multi-agent epistemic models with per-agent accessibility relations,
 -- public announcement semantics, group/common knowledge, and bisimulation.
 module Gamen.Epistemic
-  ( -- * Epistemic frames and models (Definition 15.4)
+  ( -- * Epistemic frames and models (Definition 13.4)
     Agent
   , EpistemicFrame(..)
   , EpistemicModel(..)
@@ -13,15 +13,15 @@ module Gamen.Epistemic
   , agents
   , eAccessible
   , eDoxasticAccessible
-    -- * Semantics (Definition 15.5, 15.11)
+    -- * Semantics (Definition 13.5, 15.11)
   , eSatisfies
   , eIsTrueIn
-    -- * Model restriction (Definition 15.11)
+    -- * Model restriction (Definition 13.11)
   , restrictModel
-    -- * Group and common knowledge (Definition 15.3, 15.6)
+    -- * Group and common knowledge (Definition 13.3, 15.6)
   , groupKnows
   , commonKnowledge
-    -- * Bisimulation (Definition 15.7)
+    -- * Bisimulation (Definition 13.7)
   , isBisimulation
   , bisimilarWorlds
     -- * Conversion
@@ -40,7 +40,7 @@ import Gamen.Kripke (World, Model(..), Frame(..), mkFrame, mkModel, accessible)
 type Agent = String
 
 -- --------------------------------------------------------------------
--- Epistemic frames and models (Definition 15.4, B&D)
+-- Epistemic frames and models (Definition 13.4, B&D)
 -- --------------------------------------------------------------------
 
 -- | A multi-agent epistemic frame with per-agent accessibility relations.
@@ -120,7 +120,7 @@ eDoxasticAccessible fr agent w =
     Just rel -> Map.findWithDefault Set.empty w rel
 
 -- --------------------------------------------------------------------
--- Semantics (Definition 15.5 and 15.11, B&D)
+-- Semantics (Definition 13.5 and 15.11, B&D)
 -- --------------------------------------------------------------------
 
 -- | M, w ⊩ A for epistemic models. Handles all formula constructors
@@ -183,7 +183,7 @@ eIsTrueIn :: EpistemicModel -> Formula -> Bool
 eIsTrueIn m f = all (\w -> eSatisfies m w f) (eWorlds (eFrame m))
 
 -- --------------------------------------------------------------------
--- Model restriction (Definition 15.11, B&D)
+-- Model restriction (Definition 13.11, B&D)
 -- --------------------------------------------------------------------
 
 -- | Construct the restricted model M|B where:
@@ -204,7 +204,7 @@ restrictModel m announcement =
   in EpistemicModel (EpistemicFrame wPrime newRels newDox) newVal
 
 -- --------------------------------------------------------------------
--- Group and common knowledge (Definition 15.3, 15.6, B&D)
+-- Group and common knowledge (Definition 13.3, 15.6, B&D)
 -- --------------------------------------------------------------------
 
 -- | Everybody-knows operator: E_{G'} A = ∧_{b∈G'} K_b A.
@@ -225,7 +225,7 @@ commonKnowledge m w agentList f = all (\v -> eSatisfies m v f) reachable
       in bfs (Set.union visited new) (queue ++ Set.toList new)
 
 -- --------------------------------------------------------------------
--- Bisimulation (Definition 15.7, B&D)
+-- Bisimulation (Definition 13.7, B&D)
 -- --------------------------------------------------------------------
 
 -- | Check whether a relation is a bisimulation between two models.

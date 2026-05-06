@@ -23,9 +23,13 @@ import Gamen.RankingTheory
 import Gamen.Tableau
 import Gamen.Temporal
 import Gamen.Xstit
+import qualified PaperCorrespondence
+import qualified Properties
 
 main :: IO ()
 main = hspec $ do
+  PaperCorrespondence.spec
+  Properties.spec
 
   describe "Formula (Definition 1.2)" $ do
 

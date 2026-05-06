@@ -1,4 +1,4 @@
--- | Temporal logics (Chapter 14, B&D / BdRV).
+-- | Temporal logics (BdRV §1.3; not covered in B&D Fall 2019 edition).
 --
 -- Temporal frame condition rules, frame properties, and the combined
 -- deontic-temporal tableau system KDt.
@@ -14,13 +14,16 @@ module Gamen.Temporal
   , applyTemporal4PastDiamondRule
     -- * Combined system
   , systemKDt
-    -- * Temporal frame properties (Table 14.1, B&D)
+    -- * Temporal frame properties (standard tense-logic correspondence)
   , isTransitiveFrame
   , isLinearFrame
   , isDenseFrame
   , isUnboundedPast
   , isUnboundedFuture
   ) where
+-- Note: module header formerly cited "Chapter 14, B&D" — the Fall 2019
+-- edition of Boxes and Diamonds ends at Chapter 13 (Epistemic Logics) and
+-- contains no temporal chapter. Frame conditions follow BdRV §1.3.
 
 import Data.Set qualified as Set
 
@@ -154,11 +157,11 @@ systemKDt = System "KDt"
     dDiamondRule _ _ = NoRule
 
 -- --------------------------------------------------------------------
--- Temporal frame properties (Table 14.1, B&D)
+-- Temporal frame properties (standard tense-logic correspondence)
 -- --------------------------------------------------------------------
 
 -- | Is the frame's relation transitive?
--- Corresponds to FFp → Fp (Table 14.1, B&D).
+-- Corresponds to FFp → Fp (4 axiom, transitivity).
 isTransitiveFrame :: Frame -> Bool
 isTransitiveFrame fr = all (\u ->
   all (\v ->
@@ -169,7 +172,7 @@ isTransitiveFrame fr = all (\u ->
 
 -- | Is the frame's relation linear?
 -- forall w v, w ≺ v or w = v or v ≺ w.
--- Corresponds to (FPp ∨ PFp) → (Pp ∨ p ∨ Fp) (Table 14.1, B&D).
+-- Corresponds to (FPp ∨ PFp) → (Pp ∨ p ∨ Fp) (standard tense-logic correspondence).
 isLinearFrame :: Frame -> Bool
 isLinearFrame fr =
   let ws = Set.toList (worlds fr)
@@ -181,7 +184,7 @@ isLinearFrame fr =
 
 -- | Is the frame dense?
 -- forall w v, w ≺ v → exists u, w ≺ u and u ≺ v.
--- Corresponds to Fp → FFp (Table 14.1, B&D).
+-- Corresponds to Fp → FFp (standard tense-logic correspondence).
 isDenseFrame :: Frame -> Bool
 isDenseFrame fr = all (\w ->
   all (\v ->
@@ -193,7 +196,7 @@ isDenseFrame fr = all (\w ->
 
 -- | Does the frame have an unbounded past?
 -- forall w, exists v, v ≺ w.
--- Corresponds to Hp → Pp (Table 14.1, B&D).
+-- Corresponds to Hp → Pp (standard tense-logic correspondence).
 isUnboundedPast :: Frame -> Bool
 isUnboundedPast fr = all (\w ->
   any (\v -> Set.member w (accessible fr v)) (worlds fr))
@@ -201,7 +204,7 @@ isUnboundedPast fr = all (\w ->
 
 -- | Does the frame have an unbounded future?
 -- forall w, exists v, w ≺ v.
--- Corresponds to Gp → Fp (Table 14.1, B&D).
+-- Corresponds to Gp → Fp (standard tense-logic correspondence).
 isUnboundedFuture :: Frame -> Bool
 isUnboundedFuture fr =
   all (\w -> not (Set.null (accessible fr w))) (worlds fr)

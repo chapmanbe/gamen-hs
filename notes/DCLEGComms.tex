@@ -1,0 +1,65 @@
+\usepackage{indentfirst}
+\usepackage{authblk}
+\usepackage{enumitem}
+\usepackage{subcaption}
+\usepackage{stmaryrd}
+\usepackage{fontspec}
+\setmainfont{baskervillef}
+%\usepackage[bb=ncmbbk]{mathalpha}
+\let\epsilon\varepsilon
+
+\DeclareFontFamily{U}{txsyc}{}
+\DeclareFontShape{U}{txsyc}{m}{n}{<-> txsyc}{}
+\DeclareSymbolFont{txsymbols}{U}{txsyc}{m}{n}
+\DeclareSymbolFont{lettersA}{U}{txmia}{m}{it}
+\DeclareMathSymbol{\boxright}{\mathrel}{txsymbols}{"80}
+\DeclareMathSymbol{\boxleft}{\mathrel}{txsymbols}{"81}
+\DeclareMathSymbol{\Diamondright}{\mathrel}{txsymbols}{"84}
+\DeclareMathSymbol{\strictif}{\mathrel}{txsymbols}{74}
+\DeclareMathSymbol{\gammaup}{\mathalpha}{lettersA}{13}
+
+\usepackage{mathrsfs}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+
+\newfontfamily\runefont{Junicode}
+%\newcommand{\ear}{\text{\runefont{ᛠ}}}
+%\newcommand{\cen}{\text{\runefont{ᚳ}}}
+\newcommand{\yr}{\,\text{\runefont{ᚣ}}}
+
+
+
+\newcommand{\Agt}{\mathbb{A}}
+\newcommand{\Act}{\mathbb{M}}
+%\newcommand{\Agt}{\textbf{Agent}}
+%\newcommand{\Act}{\textbf{Action}}
+\newcommand{\Prop}{\mathbb{P}}
+\newcommand{\fin}{\text{end}}
+\newcommand{\beg}{\text{start}}
+\newcommand{\turn}{\text{turn}}
+\newcommand{\nx}{\text{next}}
+\newcommand{\X}{\text{X}\,}
+\newcommand{\AX}{\text{AX}\,}
+\newcommand{\Y}{\text{Y}\,}
+\newcommand{\EV}{\text{EndV}}
+\newcommand{\PM}{\text{PMoves}}
+\newcommand{\boxiff}{%
+  \mathrel{%
+    \vcenter{%
+      \hbox{%
+        \ooalign{%
+          \hfil$\mkern14mu \boxright$\hfil\cr
+          \hfil$\mkern-14mu \boxleft$\hfil\cr
+        }%
+      }%
+    }%
+  }%
+}
+\newcommand{\Mv}{\text{Move}}
+\newcommand{\BI}{\text{BI}}
+\newcommand{\Rat}{\text{Rat}}
+%\newcommand{\U}{\text{U}\,}
+
+\renewcommand{\gamma}{\gammaup}
+
